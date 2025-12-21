@@ -34,11 +34,32 @@ class ScannerViewModel: ObservableObject {
     }
     
     func scan(pdfURL: URL) {
-        // Tutarlı Vision OCR için ilk sayfayı görüntüye dönüştür
-        if let image = ocrService.generateImage(from: pdfURL) {
-            scan(image: image)
-        } else {
-            self.errorMessage = "PDF dosyası okunamadı."
+        self.isScanning = true
+        self.errorMessage = nil
+        
+        ocrService.extractText(from: pdfURL) { [weak self] text, blocks in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                if text.isEmpty {
+                    self.errorMessage = "PDF içeriği okunamadı."
+                    self.isScanning = false
+                    return
+                }
+                
+                // Parser artık hem metin hem de opsiyonel blokları alacak
+                let invoice = self.parser.parse(text: text, blocks: blocks)
+                self.scannedInvoice = invoice
+                
+                // Hata ayıklama için konsola bas
+                print("ScannerVM: Fatura Ayrıştırıldı (Güven: \(String(format: "%.2f", invoice.confidenceScore)))")
+                print("  - Tedarikçi: \(invoice.supplierName ?? "Yok")")
+                print("  - Tutar: \(invoice.totalAmount != nil ? "\(invoice.totalAmount!)" : "Yok")")
+                print("  - ETTN: \(invoice.ettn?.uuidString ?? "Yok")")
+                print("  - Fatura No: \(invoice.invoiceNumber ?? "Yok")")
+                
+                self.isScanning = false
+            }
         }
     }
 }

@@ -50,27 +50,47 @@ class OCRService {
         }
     }
     
-    /// PDF belgesinden metin ayıklar (MVP için sadece 1. Sayfa)
-    func extractText(from pdfURL: URL) -> [TextBlock] {
-        guard let document = PDFDocument(url: pdfURL),
-              let page = document.page(at: 0) else {
-            return []
+    /// Hibrit Ayıklama: Önce PDFKit (Text), olmazsa Vision OCR (Image)
+    func extractText(from pdfURL: URL, completion: @escaping (String, [TextBlock]?) -> Void) {
+        guard let document = PDFDocument(url: pdfURL) else {
+            completion("", nil)
+            return
         }
         
-        // PDFKit ayıklaması farklıdır. Ham metin veya özellikli metin alabiliriz.
-        // Standart API ile her satır için hassas sınırlayıcı kutular almak zor olabilir.
-        // 'Lightweight' yapı için sadece string bilgisini alabiliriz.
-        // ANCAK, stratejilerimiz uzamsal konumlara (Üst %20, Alt %30) dayanmaktadır.
-        // PDF'den TextBlock oluşturmanın bir yoluna ihtiyacımız var.
-        // Tek tip boru hattı için sağlam yol: PDF sayfasını Görüntüye dönüştür ve Vision çalıştır.
-        // Bu, hem PDF hem de Kamera mantığı için aynı koordinat sistemini sağlar.
+        // Adım 1: PDFKit ile Doğrudan Metin Denemesi
+        // Tüm sayfalardaki metni birleştir
+        let pageCount = document.pageCount
+        var fullText = ""
+        for i in 0..<pageCount {
+            if let page = document.page(at: i), let pageText = page.string {
+                fullText += pageText + "\n"
+            }
+        }
         
-        _ = self.image(from: page)
-        // Burada senkron/asenkron olmamız gerektiğinden, asenkron vision çağrısını uyarlamak gerekir.
-        // Bu v0 sürümü için basitlik adına, ViewModel seviyesinde callback modelini kullandığımızı varsayalım
-        // veya burada bekleyelim (UI için ideal değil). Temiz tutmak için Görüntü ayıklama mantığını yeniden kullanalım
-        // ancak bu fonksiyon imzası senkron dönüş öneriyor. Tasarımı standart asenkron yapıya düzeltelim.
-        return [] // Yer tutucu: ViewModel'ler "render et sonra ayıkla" akışını yönetmeli.
+        // Temizlik ve Kontrol
+        let cleanText = fullText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanText.count > 50 {
+            print("OCRService: PDFKit üzerinden metin alındı (\(cleanText.count) karakter).")
+            completion(cleanText, nil) // Koordinat yok, sadece metin
+            return
+        }
+        
+        // Adım 2: Yetersiz metin ise Görüntü İşleme (Vision OCR)
+        print("OCRService: PDFKit yetersiz, Vision OCR devreye giriyor...")
+        guard let page = document.page(at: 0) else {
+            completion("", nil)
+            return
+        }
+        
+        // Görüntüye çevir
+        let image = self.image(from: page)
+        
+        // Vision OCR çalıştır
+        self.extractText(from: image) { blocks in
+            // Bloklardan metni oluştur
+            let ocrText = blocks.map { $0.text }.joined(separator: "\n")
+            completion(ocrText, blocks)
+        }
     }
     
     func generateImage(from pdfURL: URL) -> UIImage? {

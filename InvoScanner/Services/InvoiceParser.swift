@@ -2,22 +2,29 @@ import Foundation
 
 class InvoiceParser {
     
-    // Stratejiler
-    private let ettnStrategy = ETTNStrategy()
-    private let dateStrategy = DateStrategy()
-    private let amountStrategy = AmountStrategy()
-    private let supplierStrategy = SupplierStrategy()
+    private let resolver = StrategyResolver()
     
-    func parse(blocks: [TextBlock]) -> Invoice {
-        var invoice = Invoice()
-        invoice.rawBlocks = blocks // Ham veriyi sakla
+    /// Metin ve/veya bloklardan faturayı ayrıştırır
+    func parse(text: String = "", blocks: [TextBlock]? = nil) -> Invoice {
         
-        // Stratejileri Çalıştır
-        invoice.ettn = ettnStrategy.extract(from: blocks)
-        invoice.date = dateStrategy.extract(from: blocks)
-        invoice.totalAmount = amountStrategy.extract(from: blocks)
-        invoice.supplierName = supplierStrategy.extract(from: blocks)
+        // 1. Normalizasyon: OCR hatası temizliği ve standartlaştırma
+        // Eğer text boşsa bloklardan elde etmeye çalış, o da yoksa boş string
+        let rawText = text.isEmpty ? (blocks?.map { $0.text }.joined(separator: "\n") ?? "") : text
+        let normalizedText = TextNormalizer.normalize(rawText)
+        
+        // 2. Strateji Seçimi: Marka tespiti veya Generic
+        let strategy = resolver.resolve(text: normalizedText)
+        
+        print("Parser: Seçilen Strateji -> \(type(of: strategy))")
+        
+        // 3. Ayıklama
+        let invoice = strategy.extract(text: normalizedText, rawBlocks: blocks)
         
         return invoice
+    }
+    
+    // Geriye dönük uyumluluk (Eski testler ve çağrılar için)
+    func parse(blocks: [TextBlock]) -> Invoice {
+        return parse(text: "", blocks: blocks)
     }
 }

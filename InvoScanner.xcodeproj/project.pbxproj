@@ -29,6 +29,16 @@
 		74A2A1842EF85B1B007B1AD2 /* InvoScannerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InvoScannerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		740AFB412EF895670038C609 /* Exceptions for "InvoScannerTests" folder in "InvoScanner" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/TestCases.json,
+			);
+			target = 74A2A16A2EF85B1A007B1AD2 /* InvoScanner */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		74A2A16D2EF85B1A007B1AD2 /* InvoScanner */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -37,6 +47,9 @@
 		};
 		74A2A17D2EF85B1B007B1AD2 /* InvoScannerTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				740AFB412EF895670038C609 /* Exceptions for "InvoScannerTests" folder in "InvoScanner" target */,
+			);
 			path = InvoScannerTests;
 			sourceTree = "<group>";
 		};
