@@ -8,7 +8,10 @@ struct GenericStrategy: InvoiceExtractionStrategy {
     private let ettnStrategy = ETTNStrategy()
     private let dateStrategy = DateStrategy()
     private let amountStrategy = AmountStrategy()
-    private let supplierStrategy = SupplierStrategy()
+    private let supplierStrategy = SupplierStrategy() // Eski koordinat tabanlı (Fallback)
+    
+    // V1: Vergi bloğu tabanlı satıcı tespit
+    private let supplierExtractorV2 = SupplierExtractorV2()
     
     func canHandle(text: String) -> Bool {
         return true
@@ -23,7 +26,9 @@ struct GenericStrategy: InvoiceExtractionStrategy {
         invoice.invoiceNumber = extractInvoiceNumber(text: text)
         invoice.date = extractDate(text: text)
         invoice.totalAmount = extractAmount(text: text)
-        invoice.supplierName = extractSupplier(text: text) // Regex ile zor, fallback'e kalabilir
+        
+        // V1: Satıcı tespiti - Vergi bloğu algoritması
+        invoice.supplierName = supplierExtractorV2.extract(from: text)
         
         // 2. Fallback: Coordinate-Based Extraction (Eksik alanlar için)
         if let blocks = rawBlocks, !blocks.isEmpty {

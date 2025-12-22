@@ -4,6 +4,7 @@ struct HepsiburadaStrategy: InvoiceExtractionStrategy {
     
     private let keywords = ["D-MARKET", "HEPSIBURADA", "H BILISIM"]
     private let genericFallback = GenericStrategy()
+    private let supplierExtractorV2 = SupplierExtractorV2()
     
     func canHandle(text: String) -> Bool {
         for keyword in keywords {
@@ -15,20 +16,30 @@ struct HepsiburadaStrategy: InvoiceExtractionStrategy {
     func extract(text: String, rawBlocks: [TextBlock]?) -> Invoice {
         var invoice = genericFallback.extract(text: text, rawBlocks: rawBlocks)
         
-        // Hepsiburada Özel Mantığı
+        // V1: Hepsiburada Platform vs Marketplace Ayrımı
         
-        // Satıcı Tespiti: Platform (D-Market) mi, Pazaryeri mi?
-        if text.contains("D-MARKET") || text.contains("D MARKET") {
-            // Platform Satışı
-            invoice.supplierName = "D-MARKET ELEKTRONİK HİZMETLER VE TİC. A.Ş."
-        } else {
-            // Pazaryeri satıcısı: Generic ayıklamaya güven veya geliştir
+        // 1. SellerProfile kontrolü (Platform satışı mı?)
+        if let profile = SellerProfileRegistry.findProfile(for: text),
+           profile.name == "D-MARKET",
+           let forcedName = profile.forceSupplierName {
+            
+            // Platform satışı: D-MARKET kendisi satıyor
+            // Ancak VKN bloğundan başka bir satıcı çıkarsa = Marketplace
+            let taxBlockSupplier = supplierExtractorV2.extract(from: text)
+            
+            if let detectedSupplier = taxBlockSupplier,
+               !detectedSupplier.contains("D-MARKET") && !detectedSupplier.contains("D MARKET") {
+                // Marketplace satışı: Tax Block'tan gelen satıcıyı kullan
+                invoice.supplierName = detectedSupplier
+                print("HepsiburadaStrategy: Marketplace satışı tespit edildi: \(detectedSupplier)")
+            } else {
+                // Platform satışı
+                invoice.supplierName = forcedName
+                print("HepsiburadaStrategy: Platform satışı (D-MARKET)")
+            }
         }
-        
-        // ETTN Bölünmüş Satır Kontrolü (Hepsiburada klasiği)
-        // Generic Strategy ETTN Regex'i zaten basit boşlukları (multiline değilse) handle edebilir.
-        // Ancak satır sonu bölünmesini Generic içinde handle ediyor olmalıyız (clean text ile).
         
         return invoice
     }
 }
+

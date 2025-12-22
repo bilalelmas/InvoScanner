@@ -1,0 +1,29 @@
+[
+  {
+    "id": "platform_hb_01",
+    "description": "Hepsiburada Platform Satışı (D-MARKET)",
+    "invoiceNo": "7214129698",
+    "supplierName": "D-MARKET ELEKTRONİK HİZMETLER VE TİC. A.Ş.",
+    "totalAmount": 258.89,
+    "ettn": "EFED1D09-F821-12F1-80FD-005056876266",
+    "minConfidence": 0.7
+  },
+  {
+    "id": "platform_trendyol_01",
+    "description": "Trendyol Platform Satışı (DSM GRUP)",
+    "invoiceNo": "GIB2024000123456",
+    "supplierName": "DSM GRUP DANIŞMANLIK İLETİŞİM VE SATIŞ TİC.A.Ş.",
+    "totalAmount": 120.00,
+    "ettn": "123E4567-E89B-12D3-A456-426614174000",
+    "minConfidence": 0.7
+  },
+  {
+    "id": "marketplace_corporate_01",
+    "description": "Marketplace Kurumsal Satıcı",
+    "invoiceNo": null,
+    "supplierName": "MUCIZE BATARYA TEKNOLOJILERI SANAYI VE TICARET A.S.",
+    "totalAmount": null,
+    "ettn": null,
+    "minConfidence": 0.4
+  }
+]

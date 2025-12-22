@@ -47,16 +47,21 @@ class ScannerViewModel: ObservableObject {
                     return
                 }
                 
-                // Parser artık hem metin hem de opsiyonel blokları alacak
+                // V1: Parser artık hem metin hem de opsiyonel blokları kabul ediyor
                 let invoice = self.parser.parse(text: text, blocks: blocks)
                 self.scannedInvoice = invoice
                 
-                // Hata ayıklama için konsola bas
-                print("ScannerVM: Fatura Ayrıştırıldı (Güven: \(String(format: "%.2f", invoice.confidenceScore)))")
-                print("  - Tedarikçi: \(invoice.supplierName ?? "Yok")")
-                print("  - Tutar: \(invoice.totalAmount != nil ? "\(invoice.totalAmount!)" : "Yok")")
-                print("  - ETTN: \(invoice.ettn?.uuidString ?? "Yok")")
-                print("  - Fatura No: \(invoice.invoiceNumber ?? "Yok")")
+                // Hata ayıklama çıktısı
+                print("═══════════════════════════════════════")
+                print("ScannerVM: Fatura Ayrıştırıldı")
+                print("  Güven Skoru: \(String(format: "%.2f", invoice.confidenceScore))")
+                print("  Otomatik Kabul: \(invoice.isAutoAccepted ? "✓" : "✗")")
+                print("───────────────────────────────────────")
+                print("  ETTN: \(invoice.ettn?.uuidString ?? "—")")
+                print("  Fatura No: \(invoice.invoiceNumber ?? "—")")
+                print("  Tedarikçi: \(invoice.supplierName ?? "—")")
+                print("  Tutar: \(invoice.totalAmount.map { "\($0) TL" } ?? "—")")
+                print("═══════════════════════════════════════")
                 
                 self.isScanning = false
             }
