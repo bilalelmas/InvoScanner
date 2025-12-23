@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import VisionKit
 
 struct ScannerView: View {
     @StateObject private var viewModel = ScannerViewModel()
@@ -116,5 +117,68 @@ struct DocumentPicker: UIViewControllerRepresentable {
                 }
             }
         }
+    }
+}
+
+// MARK: - Document Camera View (VNDocumentCameraViewController Wrapper)
+
+/// VNDocumentCameraViewController için SwiftUI sarmalayıcısı
+/// - Kullanım: Anlık belge tarama için kamera arayüzü sağlar
+struct DocumentCameraView: UIViewControllerRepresentable {
+    
+    /// Tarama tamamlandığında çağrılır
+    var onScanComplete: ([UIImage]) -> Void
+    
+    /// Tarama iptal edildiğinde veya hata oluştuğunda çağrılır
+    var onCancel: () -> Void
+    
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let scanner = VNDocumentCameraViewController()
+        scanner.delegate = context.coordinator
+        return scanner
+    }
+    
+    func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScanComplete: onScanComplete, onCancel: onCancel)
+    }
+    
+    class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+        let onScanComplete: ([UIImage]) -> Void
+        let onCancel: () -> Void
+        
+        init(onScanComplete: @escaping ([UIImage]) -> Void, onCancel: @escaping () -> Void) {
+            self.onScanComplete = onScanComplete
+            self.onCancel = onCancel
+        }
+        
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+            var images: [UIImage] = []
+            for pageIndex in 0..<scan.pageCount {
+                images.append(scan.imageOfPage(at: pageIndex))
+            }
+            controller.dismiss(animated: true) { [weak self] in
+                self?.onScanComplete(images)
+            }
+        }
+        
+        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
+            controller.dismiss(animated: true) { [weak self] in
+                self?.onCancel()
+            }
+        }
+        
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
+            print("DocumentCamera Hatası: \(error.localizedDescription)")
+            controller.dismiss(animated: true) { [weak self] in
+                self?.onCancel()
+            }
+        }
+    }
+    
+    /// Cihazda doküman tarama desteği olup olmadığını kontrol eder
+    static var isSupported: Bool {
+        VNDocumentCameraViewController.isSupported
     }
 }

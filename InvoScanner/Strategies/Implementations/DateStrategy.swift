@@ -1,5 +1,8 @@
 import Foundation
 
+/// V2 Tarih Ayrıştırma Stratejisi
+/// - Özellikler: Çoklu format desteği, bağlamsal anahtar kelime önceliği
+/// - ÖNEMLİ: Geçersiz veya bulunamayan tarihlerde nil döner (Date() KULLANILMAZ)
 struct DateStrategy: ExtractionStrategy {
     typealias ResultType = Date
     
