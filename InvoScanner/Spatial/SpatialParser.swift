@@ -131,41 +131,58 @@ struct SpatialParser {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         
-        // V5.1 FIX: Adres satırlarını atlama listesi
-        let skipPrefixes = [
+        // V5.2 FIX: Adres başlangıç anahtar kelimeleri - bunları görünce DUR
+        let addressBreakWords = [
             "MAH", "MAHALLE", "CAD", "CADDE", "SOK", "SOKAK", "BULVAR",
-            "NO:", "KAT:", "DAİRE", "DAIRE", "APT", "APARTMAN",
-            "MERKEZ", "İLÇE", "ILCE", "İL:", "IL:",
+            "NO:", "KAT:", "DAİRE", "DAIRE", "APT", "APARTMAN"
+        ]
+        
+        // Noise satırları (adres değil ama isim de değil)
+        let noiseWords = [
             "VERGİ DAİRESİ", "VERGI DAIRESI", "VD:", "V.D.",
-            "TEL:", "TELEFON", "FAX:", "E-POSTA", "EPOSTA", "E-MAIL"
+            "TEL:", "TELEFON", "FAX:", "E-POSTA", "EPOSTA", "E-MAIL",
+            "MERKEZ", "İLÇE", "ILCE", "İL:", "IL:"
         ]
         
         // V5.1 FIX: Tam kelime eşleşme için suffix'ler
-        // "BAŞAK" içindeki "AŞ" eşleşmemeli
         let legalSuffixes = [" A.Ş", " AŞ", " LTD", " ŞTİ", " STI", " A.S.", " LTD.", ".Ş.", ".ş."]
+        
+        var nameParts: [String] = []
         
         for line in lines {
             let upperLine = line.uppercased()
             
-            // Adres satırını atla
-            if isNoiseLine(upperLine, prefixes: skipPrefixes) { continue }
+            // V5.2 FIX: Adres başladığı an DUR - sonraki satırları toplama
+            var isAddressStart = false
+            for word in addressBreakWords {
+                if upperLine.hasPrefix(word) || upperLine.contains(" \(word)") {
+                    isAddressStart = true
+                    break
+                }
+            }
+            if isAddressStart { break } // Döngüyü tamamen kır
             
-            // V5.1 FIX: Tam kelime suffix kontrolü
-            // Suffix satırın sonunda veya boşluktan önce olmalı
+            // Noise satırını atla ama döngüye devam et
+            if isNoiseLine(upperLine, prefixes: noiseWords) { continue }
+            
+            // Legal suffix varsa bu kesin satıcı adı - hemen döndür
             for suffix in legalSuffixes {
                 if upperLine.hasSuffix(suffix.trimmingCharacters(in: .whitespaces)) ||
                    upperLine.contains(suffix) {
-                    return line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    nameParts.append(line)
+                    return nameParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
                 }
+            }
+            
+            // Potansiyel isim parçası olarak ekle
+            if line.count > 2 {
+                nameParts.append(line)
             }
         }
         
-        // Legal suffix yoksa ilk non-noise satırı döndür
-        for line in lines {
-            let upperLine = line.uppercased()
-            if !isNoiseLine(upperLine, prefixes: skipPrefixes) && line.count > 3 {
-                return line.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+        // Birleştirilmiş ismi döndür
+        if !nameParts.isEmpty {
+            return nameParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         }
         
         return lines.first?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -258,32 +275,72 @@ struct SpatialParser {
         var invoiceNo: String?
         var date: Date?
         
-        // Fatura No pattern
-        // V5.1 FIX: [A-Z]{2,3} catches 2-letter prefixes like DM, EH, GIB
-        // \d{7,} catches shorter invoice numbers
-        let invoicePattern = try? NSRegularExpression(pattern: "[A-Z]{2,3}\\d{7,}", options: [])
+        // V5.2 FIX: E-Arşiv öncelikli fatura no arama
+        // Öncelik 1: E-Arşiv standardı [A-Z]{3}202[0-5]\d{9}
+        let eArsivPattern = try? NSRegularExpression(pattern: "[A-Z]{3}202[0-5]\\d{9}", options: [])
+        // Öncelik 2: Genel format [A-Z0-9]{2,3}\d{7,13}
+        let generalPattern = try? NSRegularExpression(pattern: "[A-Z0-9]{2,3}\\d{7,13}", options: [])
         
         // Tarih pattern
-        let datePattern = try? NSRegularExpression(pattern: "\\d{2}[./]\\d{2}[./]\\d{4}", options: [])
+        let datePattern = try? NSRegularExpression(pattern: "\\d{2}[./-]\\d{2}[./-]\\d{4}", options: [])
         
         for line in lines {
             let range = NSRange(line.startIndex..., in: line)
             
-            // Fatura No
-            if invoiceNo == nil, let match = invoicePattern?.firstMatch(in: line, range: range) {
-                invoiceNo = String(line[Range(match.range, in: line)!])
+            // Fatura No - Önce E-Arşiv formatını dene
+            if invoiceNo == nil {
+                if let match = eArsivPattern?.firstMatch(in: line, range: range) {
+                    let candidate = String(line[Range(match.range, in: line)!])
+                    if !isPhoneOrTCKN(candidate) {
+                        invoiceNo = candidate
+                    }
+                }
+            }
+            
+            // Fallback: Genel format
+            if invoiceNo == nil {
+                if let match = generalPattern?.firstMatch(in: line, range: range) {
+                    let candidate = String(line[Range(match.range, in: line)!])
+                    if !isPhoneOrTCKN(candidate) {
+                        invoiceNo = candidate
+                    }
+                }
             }
             
             // Tarih
             if date == nil, let match = datePattern?.firstMatch(in: line, range: range) {
-                let dateStr = String(line[Range(match.range, in: line)!])
+                var dateStr = String(line[Range(match.range, in: line)!])
+                
+                // V5.2 FIX: Saat bilgisini temizle (HH:MM:SS)
+                dateStr = dateStr.replacingOccurrences(of: "/", with: ".")
+                dateStr = dateStr.replacingOccurrences(of: "-", with: ".")
+                
                 let formatter = DateFormatter()
                 formatter.dateFormat = "dd.MM.yyyy"
-                date = formatter.date(from: dateStr.replacingOccurrences(of: "/", with: "."))
+                date = formatter.date(from: dateStr)
             }
         }
         
         return (invoiceNo, date)
+    }
+    
+    /// V5.2 FIX: Telefon/TCKN numarası mı kontrol et
+    /// 10-11 haneli salt rakam = muhtemelen telefon veya TCKN
+    private func isPhoneOrTCKN(_ value: String) -> Bool {
+        // Sadece rakamlardan oluşuyor mu?
+        let digitsOnly = value.filter { $0.isNumber }
+        
+        // Değerin tamamı rakamsa ve 10-11 hane arasıysa
+        if value == digitsOnly && (digitsOnly.count == 10 || digitsOnly.count == 11) {
+            return true
+        }
+        
+        // 0 ile başlıyorsa muhtemelen telefon
+        if value.hasPrefix("0") && digitsOnly.count >= 10 {
+            return true
+        }
+        
+        return false
     }
     
     private func extractTotalAmount(from text: String) -> Decimal? {
@@ -291,8 +348,19 @@ struct SpatialParser {
         
         var maxAmount: Decimal = 0
         
-        // Toplam satırlarını bul
-        let keywords = ["GENEL TOPLAM", "ÖDENECEK TUTAR", "TOPLAM"]
+        // V5.2 FIX: Genişletilmiş anahtar kelime listesi
+        let keywords = [
+            "GENEL TOPLAM", 
+            "ÖDENECEK TUTAR", 
+            "ODENECEK TUTAR",
+            "VERGİLER DAHİL TOPLAM",
+            "VERGILER DAHIL TOPLAM",
+            "VERGİLİ MAL BEDELİ",
+            "VERGILI MAL BEDELI",
+            "ÖDENECEK",
+            "ODENECEK",
+            "TOPLAM"
+        ]
         
         for line in lines {
             for keyword in keywords {
@@ -308,17 +376,49 @@ struct SpatialParser {
     }
     
     private func extractAmount(from text: String) -> Decimal? {
-        // TR format: 1.234,56
-        let pattern = "\\d{1,3}(?:\\.\\d{3})*,\\d{2}"
+        // V5.2 FIX: Esnek tutar regex - OCR varyasyonlarını kapsar
+        // Standart TR: 1.234,56
+        // OCR hataları: 1 234,56 veya 1.234.56 veya 1234,56
+        
+        // Önce standart TR formatını dene
+        let standardPattern = "\\d{1,3}(?:[.\\s]\\d{3})*[,]\\d{2}"
+        if let result = tryExtractAmount(from: text, pattern: standardPattern) {
+            return result
+        }
+        
+        // Fallback: Basit virgüllü format (1234,56)
+        let simplePattern = "\\d+[,]\\d{2}"
+        if let result = tryExtractAmount(from: text, pattern: simplePattern) {
+            return result
+        }
+        
+        // Fallback: Noktalı format (1234.56 - yabancı format veya OCR hatası)
+        let dotPattern = "\\d{1,3}(?:\\s\\d{3})*\\.\\d{2}$"
+        return tryExtractAmount(from: text, pattern: dotPattern, useDot: true)
+    }
+    
+    /// Pattern ile tutar çıkarma helper
+    private func tryExtractAmount(from text: String, pattern: String, useDot: Bool = false) -> Decimal? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         
         let range = NSRange(text.startIndex..., in: text)
         if let match = regex.firstMatch(in: text, range: range) {
-            let amountStr = String(text[Range(match.range, in: text)!])
-            let normalized = amountStr
-                .replacingOccurrences(of: ".", with: "")
-                .replacingOccurrences(of: ",", with: ".")
-            return Decimal(string: normalized)
+            var amountStr = String(text[Range(match.range, in: text)!])
+            
+            // Normalize: Boşlukları temizle
+            amountStr = amountStr.replacingOccurrences(of: " ", with: "")
+            
+            if useDot {
+                // Nokta ondalık ayırıcı
+                amountStr = amountStr.replacingOccurrences(of: ",", with: "")
+            } else {
+                // Virgül ondalık ayırıcı (TR standart)
+                amountStr = amountStr
+                    .replacingOccurrences(of: ".", with: "")
+                    .replacingOccurrences(of: ",", with: ".")
+            }
+            
+            return Decimal(string: amountStr)
         }
         return nil
     }
