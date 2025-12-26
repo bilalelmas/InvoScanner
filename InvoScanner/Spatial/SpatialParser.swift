@@ -137,11 +137,22 @@ struct SpatialParser {
             "NO:", "KAT:", "DAİRE", "DAIRE", "APT", "APARTMAN"
         ]
         
-        // Noise satırları (adres değil ama isim de değil)
+        // V5.2 Final Polish: Genişletilmiş noise/atlama listesi
         let noiseWords = [
+            // Vergi bilgileri
             "VERGİ DAİRESİ", "VERGI DAIRESI", "VD:", "V.D.",
-            "TEL:", "TELEFON", "FAX:", "E-POSTA", "EPOSTA", "E-MAIL",
-            "MERKEZ", "İLÇE", "ILCE", "İL:", "IL:"
+            // İletişim
+            "TEL:", "TELEFON", "FAX:", "E-POSTA", "EPOSTA", "E-MAIL", "MAILTO:",
+            // Konum
+            "MERKEZ", "İLÇE", "ILCE", "İL:", "IL:",
+            // Fatura başlıkları (yeni)
+            "E-ARŞİV", "E-ARSIV", "E-FATURA", "E-İRSALİYE",
+            "ARŞİV FATURA", "ARSIV FATURA",
+            // Alıcı işaretleri
+            "SAYIN", "SAYIN:", "ALICI", "ALICI:",
+            "ADRES:", "ADRES :",
+            // Diğer
+            "MERSIS NO", "MERSİS NO"
         ]
         
         // V5.1 FIX: Tam kelime eşleşme için suffix'ler
@@ -162,15 +173,17 @@ struct SpatialParser {
             }
             if isAddressStart { break } // Döngüyü tamamen kır
             
-            // Noise satırını atla ama döngüye devam et
+            // V5.2 Final Polish: Noise satırını atla
             if isNoiseLine(upperLine, prefixes: noiseWords) { continue }
             
-            // Legal suffix varsa bu kesin satıcı adı - hemen döndür
+            // Legal suffix varsa bu kesin satıcı adı
             for suffix in legalSuffixes {
                 if upperLine.hasSuffix(suffix.trimmingCharacters(in: .whitespaces)) ||
                    upperLine.contains(suffix) {
                     nameParts.append(line)
-                    return nameParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                    // V5.2 Final Polish: Suffix truncation - Legal suffix sonrasını kes
+                    let result = nameParts.joined(separator: " ")
+                    return truncateAfterLegalSuffix(result)
                 }
             }
             
@@ -182,10 +195,28 @@ struct SpatialParser {
         
         // Birleştirilmiş ismi döndür
         if !nameParts.isEmpty {
-            return nameParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            let result = nameParts.joined(separator: " ")
+            return truncateAfterLegalSuffix(result)
         }
         
         return lines.first?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    /// V5.2 Final Polish: Legal suffix sonrasındaki garbage'ı temizler
+    /// Örn: "DSM GRUP TİCARET A.Ş. Mahalle Cad. No:5" -> "DSM GRUP TİCARET A.Ş."
+    private func truncateAfterLegalSuffix(_ text: String) -> String {
+        let suffixes = ["A.Ş.", "AŞ.", "A.Ş", "LTD.ŞTİ.", "LTD. ŞTİ.", "LTD.ŞTİ", "LTD ŞTİ", "LTD.", "ŞTİ.", "STI."]
+        let upperText = text.uppercased()
+        
+        for suffix in suffixes {
+            if let range = upperText.range(of: suffix) {
+                let endIndex = range.upperBound
+                let originalEndIndex = text.index(text.startIndex, offsetBy: upperText.distance(from: upperText.startIndex, to: endIndex))
+                return String(text[..<originalEndIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     /// Bir satırın "gürültü" (adres, iletişim vb.) olup olmadığını kontrol eder
@@ -346,33 +377,48 @@ struct SpatialParser {
     private func extractTotalAmount(from text: String) -> Decimal? {
         let lines = text.uppercased().components(separatedBy: .newlines)
         
-        var maxAmount: Decimal = 0
-        
-        // V5.2 FIX: Genişletilmiş anahtar kelime listesi
-        let keywords = [
-            "GENEL TOPLAM", 
-            "ÖDENECEK TUTAR", 
-            "ODENECEK TUTAR",
-            "VERGİLER DAHİL TOPLAM",
-            "VERGILER DAHIL TOPLAM",
-            "VERGİLİ MAL BEDELİ",
-            "VERGILI MAL BEDELI",
-            "ÖDENECEK",
-            "ODENECEK",
-            "TOPLAM"
+        // V5.2 Final Polish: Öncelik bazlı anahtar kelimeler
+        // Yüksek öncelikli kelimeler düşük öncelikliden daha güvenilir
+        let priorityKeywords: [(keyword: String, priority: Int)] = [
+            ("ÖDENECEK TUTAR", 100),
+            ("ODENECEK TUTAR", 100),
+            ("GENEL TOPLAM", 90),
+            ("VERGİLER DAHİL TOPLAM", 85),
+            ("VERGILER DAHIL TOPLAM", 85),
+            ("VERGİLİ MAL BEDELİ", 80),
+            ("VERGILI MAL BEDELI", 80),
+            ("ÖDENECEK", 75),
+            ("ODENECEK", 75),
+            ("TOPLAM TUTAR", 60),
+            ("TOPLAM", 50)  // En düşük öncelik
         ]
         
+        // Aday tutarları (tutar, öncelik) olarak topla
+        var candidates: [(amount: Decimal, priority: Int)] = []
+        
         for line in lines {
-            for keyword in keywords {
+            for (keyword, priority) in priorityKeywords {
                 if line.contains(keyword) {
-                    if let amount = extractAmount(from: line), amount > maxAmount {
-                        maxAmount = amount
+                    if let amount = extractAmount(from: line), amount > 0 {
+                        candidates.append((amount, priority))
                     }
+                    break // Bir satırda bir keyword yeterli
                 }
             }
         }
         
-        return maxAmount > 0 ? maxAmount : nil
+        // En yüksek öncelikli tutarı seç
+        // Aynı öncelikte birden fazla varsa en büyük tutarı al
+        if let best = candidates.sorted(by: { 
+            if $0.priority != $1.priority {
+                return $0.priority > $1.priority // Öncelik yüksek olan önce
+            }
+            return $0.amount > $1.amount // Aynı öncelikte büyük tutar
+        }).first {
+            return best.amount
+        }
+        
+        return nil
     }
     
     private func extractAmount(from text: String) -> Decimal? {
