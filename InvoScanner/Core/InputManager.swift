@@ -50,13 +50,28 @@ enum InputError: LocalizedError {
 
 /// Native PDF dosyalarından metin çıkarır
 /// - Öncelik: PDFKit (Text Layer), Fallback: Vision OCR
+/// - Security-Scoped Resource erişimini yönetir (Document Picker'dan gelen dosyalar için)
 struct PDFInputProvider: InputProviding {
     let url: URL
     
     func process() async throws -> [TextBlock] {
+        // Security-Scoped Resource erişimini başlat
+        // Document Picker'dan seçilen dosyalar sandbox dışında olabilir
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        
+        // Erişim başladıysa, işlem bittiğinde mutlaka durdur
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        
         guard let document = PDFDocument(url: url) else {
+            print("PDFInputProvider: PDF açılamadı - URL: \(url.lastPathComponent)")
             throw InputError.invalidPDF
         }
+        
+        print("PDFInputProvider: PDF başarıyla açıldı - \(document.pageCount) sayfa")
         
         // Adım 1: PDFKit ile doğrudan metin denemesi
         var fullText = ""
@@ -68,11 +83,15 @@ struct PDFInputProvider: InputProviding {
         
         let cleanText = fullText.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Yeterli metin varsa, TextBlock olarak dön (koordinatsız)
+        // Yeterli metin varsa satırlara böl ve yapay koordinat ata
         if cleanText.count > 50 {
             print("PDFInputProvider: PDFKit ile \(cleanText.count) karakter alındı.")
-            // Native PDF'ler için tek bir büyük TextBlock döndürüyoruz
-            return [TextBlock(text: cleanText, frame: .zero)]
+            
+            // V5 FIX: Metni satırlara böl ve yapay koordinat ata
+            // Bu sayede SpatialParser spatial analiz yapabilir
+            let blocks = convertTextToBlocks(cleanText)
+            print("PDFInputProvider: \(blocks.count) satır/blok oluşturuldu")
+            return blocks
         }
         
         // Adım 2: Yetersizse Vision OCR
@@ -83,6 +102,82 @@ struct PDFInputProvider: InputProviding {
         
         let image = renderPageToImage(page)
         return try await ImageInputProvider(image: image).process()
+    }
+    
+    // MARK: - Text to Blocks Conversion
+    
+    /// PDFKit metnini satırlara bölerek yapay koordinatlarla TextBlock'lara çevirir
+    /// - NOT: e-Arşiv faturaları genellikle iki kolonlu yapıdadır:
+    ///   - Sol kolon: Satıcı bilgileri (y < 0.3), Alıcı bilgileri (y 0.3-0.6)
+    ///   - Sağ kolon: Fatura meta (y < 0.3), Toplamlar (y > 0.6)
+    /// - Heuristic olarak bazı anahtar kelimeler sağ kolona yerleştirilir
+    private func convertTextToBlocks(_ text: String) -> [TextBlock] {
+        let lines = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        
+        guard !lines.isEmpty else { return [] }
+        
+        var blocks: [TextBlock] = []
+        let lineHeight: CGFloat = 0.02  // Her satır ~%2 yükseklik
+        let lineSpacing: CGFloat = 0.01 // Satırlar arası boşluk
+        
+        // Sağ kolon anahtar kelimeleri
+        let rightColumnKeywords = [
+            "FATURA NO", "BELGE NO", "TARIH", "TARİH", "DÜZENLEME", "DUZENLEME",
+            "TOPLAM", "KDV", "MATRAH", "ODENECEK", "ÖDENECEK", "SENARYO", 
+            "FATURA TİPİ", "FATURA TIPI", "SAAT"
+        ]
+        
+        // Alt bölge anahtar kelimeleri (genellikle toplamlar veya footer)
+        let bottomKeywords = [
+            "GENEL TOPLAM", "ÖDENECEK TUTAR", "YALNIZ", "IBAN", "BANKA",
+            "HESAP NO", "ETTN"
+        ]
+        
+        var currentY: CGFloat = 0.05
+        
+        for line in lines {
+            let upperLine = line.uppercased()
+            
+            // X pozisyonu belirle (heuristic)
+            var xPosition: CGFloat = 0.1  // Default: Sol kolon
+            
+            // Sağ kolon kontrolü
+            for keyword in rightColumnKeywords {
+                if upperLine.contains(keyword) {
+                    xPosition = 0.55  // Sağ kolon
+                    break
+                }
+            }
+            
+            // Alt bölge kontrolü (Y pozisyonu düzeltmesi)
+            for keyword in bottomKeywords {
+                if upperLine.contains(keyword) {
+                    // Alt bölgede olmasını sağla
+                    currentY = max(currentY, 0.65)
+                    if keyword == "GENEL TOPLAM" || keyword == "ÖDENECEK TUTAR" {
+                        xPosition = 0.55  // Sağ-alt
+                    }
+                    break
+                }
+            }
+            
+            let block = TextBlock(
+                text: line,
+                frame: CGRect(x: xPosition, y: currentY, width: 0.35, height: lineHeight)
+            )
+            blocks.append(block)
+            
+            currentY += lineHeight + lineSpacing
+            
+            // Sayfa sınırını aşmayı önle
+            if currentY > 0.95 {
+                currentY = 0.95
+            }
+        }
+        
+        return blocks
     }
     
     /// PDF sayfasını UIImage'a çevirir
@@ -207,7 +302,7 @@ final class InputManager {
     
     static let shared = InputManager()
     
-    private init() {}
+    init() {}
     
     /// Belirtilen kaynaktan metin bloklarını çıkarır
     /// - Parameter source: Girdi kaynağı (PDF, Image, Camera)
@@ -224,4 +319,33 @@ final class InputManager {
             throw InputError.processingFailed("Kamera için önce görsel taranmalı.")
         }
     }
+    
+    // MARK: - Callback-Based Convenience Methods
+    
+    /// UIImage'den blok çıkarır (callback-based)
+    func extractBlocks(from image: UIImage, completion: @escaping ([TextBlock]) -> Void) {
+        Task {
+            do {
+                let blocks = try await ImageInputProvider(image: image).process()
+                completion(blocks)
+            } catch {
+                print("InputManager Error: \(error.localizedDescription)")
+                completion([])
+            }
+        }
+    }
+    
+    /// PDF URL'den blok çıkarır (callback-based)
+    func extractBlocks(from url: URL, completion: @escaping ([TextBlock]) -> Void) {
+        Task {
+            do {
+                let blocks = try await PDFInputProvider(url: url).process()
+                completion(blocks)
+            } catch {
+                print("InputManager Error: \(error.localizedDescription)")
+                completion([])
+            }
+        }
+    }
 }
+

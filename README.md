@@ -1,86 +1,51 @@
-# InvoScanner (V0)
+# 🚀 InvoScanner
 
-InvoScanner, e-Arşiv faturalarını tarayarak üzerindeki önemli verileri (ETTN, Tarih, Toplam Tutar, Tedarikçi) cihaz üzerinde hiçbir veriyi dışarıya göndermeden (Privacy-First) ayıklayan iOS tabanlı bir uygulamadır.
+**InvoScanner**, e-Arşiv faturalarından kritik verileri (ETTN, Tarih, Tutar, Satıcı) cihaz üzerinde (on-device) ayıklayan, modern iOS teknolojileriyle geliştirilmiş akıllı bir fatura yönetim sistemidir.
 
-## 📋 Proje Özeti
-- **Amaç:** Fatura takibini kolaylaştırmak için otomatik veri girişi sağlamak.
-- **Teknoloji:** iOS 17+, SwiftUI, Vision Framework (OCR), MVVM Mimarisi.
-- **Yaklaşım:** "Az ama Öz" (V0 MVP). Karmaşık bulut çözümleri yerine yerel Apple kütüphanelerini kullanır.
-- **Durum:** V0 sürümü tamamlandı, V1 için mimari planlama yapıldı.
+[![Swift](https://img.shields.io/badge/Swift-5.10-orange.svg)](https://swift.org)
+[![iOS](https://img.shields.io/badge/iOS-17.0%2B-blue.svg)](https://www.apple.com/ios/)
+[![SwiftData](https://img.shields.io/badge/Data-SwiftData-blueviolet.svg)](https://developer.apple.com/xcode/swiftdata/)
 
----
+## ✨ Öne Çıkan Özellikler
 
-## 🏗 Klasör Yapısı
-Proje, Sorumlulukların Ayrılığı (Separation of Concerns) ilkesine göre yapılandırılmıştır:
+- 🧠 **Hibrit Motor (V3):** Dijital PDF'ler için yerel metin okuma, taranmış belgeler için Vision OCR.
+- 🛡️ **Privacy-First:** Tüm işlemler cihaz üzerinde yapılır; verileriniz hiçbir sunucuya gönderilmez.
+- 📐 **Zone-Aware Parsing:** Belgedeki verileri koordinat bazlı mantıksal bölgelere ayırarak yüksek doğruluk sağlar.
+- 🧪 **Matematiksel Doğrulama:** `Matrah + KDV = Toplam` kontrolü ile hatalı tutar ayıklamayı engeller.
+- 📊 **Modern Dashboard:** SwiftCharts ile harcama analizi ve kategori bazlı görselleştirme.
 
-```
-InvoScanner/
-├── InvoScanner/
-│   ├── InvoScannerApp.swift    # Giriş Noktası
-│   ├── Models/
-│   │   ├── Invoice.swift       # Fatura Veri Modeli
-│   │   └── TextBlock.swift     # Normalize Edilmiş OCR Bloğu
-│   ├── Services/
-│   │   ├── OCRService.swift    # Vision/PDF -> Metin Dönüşümü
-│   │   └── InvoiceParser.swift # Koordinatör (Stratejileri Yönetir)
-│   ├── Strategies/
-│   │   ├── Protocols/ExplanationStrategy.swift
-│   │   └── Implementations/    # ETTN, Date, Amount, Supplier Logic
-│   ├── ViewModels/
-│   │   └── ScannerViewModel.swift # UI ve İş Mantığı Köprüsü
-│   └── Views/
-│       ├── ScannerView.swift   # Ana Ekran
-│       └── ResultView.swift    # Sonuç Gösterimi
-├── InvoScannerTests/
-│   ├── StrategyTests.swift     # Birim Testler
-│   ├── DataDrivenTests.swift   # JSON Tabanlı Senaryo Testleri
-│   └── Resources/
-│       └── TestCases.json      # Test Verileri
-└── SampleInvoices/             # Test Amaçlı Örnek Faturalar
-```
+## 🏗️ Teknoloji Yığını
 
----
+- **Dil:** Swift (SwiftUI)
+- **Mimari:** MVVM-R (Repository) + Strategy Pattern
+- **Veri Saklama:** SwiftData
+- **Frameworkler:** Vision, PDFKit, SwiftCharts
 
-## ⚙️ Çalışma Mantığı (Workflow)
+## 📁 Hızlı Başlangıç
 
-Sistem 4 ana aşamadan oluşur:
+### Gereksinimler
+- Xcode 15.0+
+- iOS 17.0+ (SwiftData desteği nedeniyle)
 
-### 1. Girdi ve OCR (OCRService)
-Kullanıcı bir **PDF** veya **Görüntü** seçer.
-- **Görüntü ise:** Doğrudan Vision Framework ile tarama.
-- **PDF ise:** İlk sayfa yüksek çözünürlüklü bir görüntüye ("render") dönüştürülür ve Vision'a verilir.
-- **Çıktı:** `[TextBlock]` listesi (Metin içeriği + Normalize Edilmiş Çerçeve [0..1]).
+### Kurulum
+1. Projeyi klonlayın:
+   ```bash
+   git clone https://github.com/bilalelmas/InvoScanner.git
+   ```
+2. `InvoScanner.xcodeproj` dosyasını Xcode ile açın.
+3. Simülatör veya iPhone cihazınızda `Run` (Cmd+R) komutunu çalıştırın.
 
-### 2. Ayrıştırma (InvoiceParser & Strategies)
-Ham metin blokları stratejilere dağıtılır. Her strateji spesifik bir veriyi arar:
-- **ETTN:** Regex ile UUID formatını arar (+ Bölünmüş satır kontrolü).
-- **Tarih:** "Tarih" anahtar kelimesi yakınındaki dd-MM-yyyy formatlarını tarar.
-- **Tutar:** Belgenin **alt %30**'luk kısmına odaklanır, "Toplam" etiketlerini ve en büyük sayıyı arar.
-- **Tedarikçi:** Belgenin **üst %20**'lik kısmına odaklanır, Şirket uzantılarını (A.Ş., LTD.) arar.
+## 📖 Teknik Dokümantasyon
 
-### 3. Sunum (MVVM)
-`ScannerViewModel`, asenkron olarak OCR ve Ayrıştırma işini yönetir. Sonuç `Invoice` nesnesine dönüştürülerek UI'da gösterilir.
+Projenin derinlemesine mimarisi, servis yapısı ve algoritma detayları için [📄 PROJE_RAPORU_V2.md](file:///Users/bilalelmas/GitHub/InvoScanner/PROJE_RAPORU_V2.md) dosyasını inceleyebilirsiniz.
 
-### 4. Test (Data-Driven)
-OCR katmanından bağımsız olarak, sadece mantığı test etmek için JSON tabanlı bir test sistemi kurulmuştur.
-- Ham verileri (`blocks`) JSON'dan alır.
-- Parser'dan geçirir.
-- Beklenen (`expected`) sonuçlarla kıyaslar.
+## 🗺️ Klasör Yapısı (Özet)
+
+- `Models/`: SwiftData veri modelleri.
+- `Services/`: OCR, Input ve İşleme servisleri.
+- `Strategies/`: Veri ayıklama algoritmaları (ETTN, Tarih, Tutar vb.).
+- `ViewModels/`: UI state yönetimi.
+- `Views/`: SwiftUI arayüz bileşenleri.
 
 ---
-
-## 🚀 Nasıl Çalıştırılır?
-
-1. Projeyi Xcode ile açın.
-2. Hedef (Target) olarak bir Simülatör seçin.
-3. **Cmd+R** ile uygulamayı başlatın.
-4. "Belge Yükle" diyerek `SampleInvoices` klasöründeki veya kendi faturanızı seçin.
-
----
-
-## 🔮 Gelecek Planı (V1 Architecture)
-V1 sürümü için daha gelişmiş bir **Hibrit Pipeline** tasarlanmıştır:
-1. Önce **PDFKit** ile metin katmanını okuma (OCR'sız, %100 doğruluk).
-2. Başarısız olursa **Vision OCR**'a düşme (Fallback).
-3. **Strict Normalization:** Tüm metinleri standartlaştırma.
-4. **Resover Pattern:** Vendor'a özel (Trendyol, Hepsiburada) ayrıştırıcı seçimi.
+*Geliştirici: [Bilal Elmas](https://github.com/bilalelmas)*

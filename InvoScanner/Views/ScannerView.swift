@@ -63,13 +63,19 @@ struct ResultView: View {
                 LabeledContent("Tarih", value: invoice.date?.formatted(date: .numeric, time: .omitted) ?? "Bulunamadı")
                 LabeledContent("Toplam", value: invoice.totalAmount?.formatted(.currency(code: "TRY")) ?? "Bulunamadı")
                 LabeledContent("ETTN", value: invoice.ettn?.uuidString ?? "Bulunamadı")
+                if let invoiceNo = invoice.invoiceNumber {
+                    LabeledContent("Fatura No", value: invoiceNo)
+                }
             }
             
-            Section("Ham Veri Blokları") {
-                ForEach(invoice.rawBlocks) { block in
-                    Text(block.text)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+            Section("OCR Kalitesi") {
+                HStack {
+                    Text("Güven Skoru")
+                    Spacer()
+                    Text(String(format: "%.0f%%", invoice.confidenceScore * 100))
+                        .foregroundStyle(invoice.isAutoAccepted ? .green : .orange)
+                    Image(systemName: invoice.isAutoAccepted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(invoice.isAutoAccepted ? .green : .orange)
                 }
             }
         }
@@ -104,16 +110,30 @@ struct DocumentPicker: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
             
-            if url.startAccessingSecurityScopedResource() {
-                defer { url.stopAccessingSecurityScopedResource() }
-                
-                if url.pathExtension.lowercased() == "pdf" {
-                    parent.onPDFSelected(url)
-                } else {
-                    if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
-                        parent.selectedImage = image
-                        parent.onImageSelected(image)
+            // Security-scoped erişimi başlat
+            // NOT: PDF için erişimi InputManager yönetiyor (async işlem nedeniyle)
+            // Image için burada durdurabiliriz çünkü senkron işlem
+            let didStartAccessing = url.startAccessingSecurityScopedResource()
+            
+            if url.pathExtension.lowercased() == "pdf" {
+                // PDF: Erişimi InputManager'a bırak (async işlem)
+                // InputManager.extractBlocks içinde startAccess tekrar çağrılacak
+                // ve işlem bitince stopAccess yapılacak
+                if didStartAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+                parent.onPDFSelected(url)
+            } else {
+                // Image: Senkron işle ve erişimi kapat
+                defer {
+                    if didStartAccessing {
+                        url.stopAccessingSecurityScopedResource()
                     }
+                }
+                
+                if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                    parent.selectedImage = image
+                    parent.onImageSelected(image)
                 }
             }
         }

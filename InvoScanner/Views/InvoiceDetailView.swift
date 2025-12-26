@@ -231,10 +231,12 @@ struct InvoiceDetailView: View {
 // MARK: - Preview
 
 #Preview {
-    InvoiceDetailView(invoice: Invoice(
-        ettn: UUID(),
-        date: Date(),
-        totalAmount: 1250.50,
-        supplierName: "TRENDYOL HIZLI TESLİMAT"
-    ))
+    var previewInvoice = Invoice()
+    previewInvoice.ettn = UUID()
+    previewInvoice.date = Date()
+    previewInvoice.totalAmount = 1250.50
+    previewInvoice.supplierName = "TRENDYOL HIZLI TESLİMAT"
+    
+    return InvoiceDetailView(invoice: previewInvoice)
 }
+

@@ -3,20 +3,28 @@ import SwiftUI
 import Combine
 import Vision
 
+// MARK: - Scanner ViewModel (V5 Entegrasyonu)
+
+/// Fatura tarama ve ayrıştırma işlemlerini yöneten ViewModel
+/// V5 Spatial Engine ile entegre çalışır
 class ScannerViewModel: ObservableObject {
     @Published var scannedInvoice: Invoice?
     @Published var isScanning = false
     @Published var errorMessage: String?
     
-    private let ocrService = OCRService()
-    private let parser = InvoiceParser()
+    // V5: Yeni bileşenler
+    private let inputManager = InputManager()
+    private let spatialParser = SpatialParser()
+    
+    // MARK: - UIImage'den Tarama
     
     func scan(image: UIImage) {
         self.isScanning = true
         self.scannedInvoice = nil
         self.errorMessage = nil
         
-        ocrService.extractText(from: image) { [weak self] blocks in
+        // V5: InputManager ile koordinatlı blok çıkarımı
+        inputManager.extractBlocks(from: image) { [weak self] blocks in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
@@ -26,45 +34,59 @@ class ScannerViewModel: ObservableObject {
                     return
                 }
                 
-                let invoice = self.parser.parse(blocks: blocks)
+                // V5: SpatialParser ile ayrıştırma
+                let result = self.spatialParser.parse(blocks)
+                let invoice = Invoice(from: result)
+                
                 self.scannedInvoice = invoice
                 self.isScanning = false
+                
+                self.debugPrint(invoice)
             }
         }
     }
+    
+    // MARK: - PDF'den Tarama
     
     func scan(pdfURL: URL) {
         self.isScanning = true
         self.errorMessage = nil
         
-        ocrService.extractText(from: pdfURL) { [weak self] text, blocks in
+        // V5: InputManager ile PDF'den koordinatlı blok çıkarımı
+        inputManager.extractBlocks(from: pdfURL) { [weak self] blocks in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
-                if text.isEmpty {
+                if blocks.isEmpty {
                     self.errorMessage = "PDF içeriği okunamadı."
                     self.isScanning = false
                     return
                 }
                 
-                // V1: Parser artık hem metin hem de opsiyonel blokları kabul ediyor
-                let invoice = self.parser.parse(text: text, blocks: blocks)
+                // V5: SpatialParser ile ayrıştırma
+                let result = self.spatialParser.parse(blocks)
+                let invoice = Invoice(from: result)
+                
                 self.scannedInvoice = invoice
-                
-                // Hata ayıklama çıktısı
-                print("═══════════════════════════════════════")
-                print("ScannerVM: Fatura Ayrıştırıldı")
-                print("  Güven Skoru: \(String(format: "%.2f", invoice.confidenceScore))")
-                print("  Otomatik Kabul: \(invoice.isAutoAccepted ? "✓" : "✗")")
-                print("───────────────────────────────────────")
-                print("  ETTN: \(invoice.ettn?.uuidString ?? "—")")
-                print("  Fatura No: \(invoice.invoiceNumber ?? "—")")
-                print("  Tedarikçi: \(invoice.supplierName ?? "—")")
-                print("  Tutar: \(invoice.totalAmount.map { "\($0) TL" } ?? "—")")
-                print("═══════════════════════════════════════")
-                
                 self.isScanning = false
+                
+                self.debugPrint(invoice)
             }
         }
+    }
+    
+    // MARK: - Debug
+    
+    private func debugPrint(_ invoice: Invoice) {
+        print("═══════════════════════════════════════")
+        print("ScannerVM [V5]: Fatura Ayrıştırıldı")
+        print("  Güven Skoru: \(String(format: "%.2f", invoice.confidenceScore))")
+        print("  Otomatik Kabul: \(invoice.isAutoAccepted ? "✓" : "✗")")
+        print("───────────────────────────────────────")
+        print("  ETTN: \(invoice.ettn?.uuidString ?? "—")")
+        print("  Fatura No: \(invoice.invoiceNumber ?? "—")")
+        print("  Tedarikçi: \(invoice.supplierName ?? "—")")
+        print("  Tutar: \(invoice.totalAmount.map { "\($0) TL" } ?? "—")")
+        print("═══════════════════════════════════════")
     }
 }

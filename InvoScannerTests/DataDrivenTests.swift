@@ -1,14 +1,15 @@
 import XCTest
 @testable import InvoScanner
 
+/// V5 Data-Driven Tests
+/// JSON'dan yüklenen test senaryolarını V5 SpatialParser ile çalıştırır
 final class DataDrivenTests: XCTestCase {
     
-    private let parser = InvoiceParser()
+    // V5: SpatialParser kullan
+    private let spatialParser = SpatialParser()
     
     func testJSONScenarios() throws {
         // 1. Verileri Yükle
-        // Not: Bu dosyanın Test Target'ına ekli olduğundan ve JSON'ın Bundle Resource olarak ekli olduğundan emin olun.
-        // Eğer Bundle'dan yüklenemezse boş döner ve test geçer (fakat uyarır).
         let testCases = TestDataLoader.loadTestCases()
         
         if testCases.isEmpty {
@@ -23,8 +24,9 @@ final class DataDrivenTests: XCTestCase {
             // TextBlock'ları oluştur
             let blocks = testCase.blocks.map { $0.toTextBlock() }
             
-            // Ayrıştır
-            let invoice = parser.parse(blocks: blocks)
+            // V5: SpatialParser ile ayrıştır
+            let result = spatialParser.parse(blocks)
+            let invoice = Invoice(from: result)
             
             // 3. Doğrula (Assertions)
             
@@ -44,11 +46,10 @@ final class DataDrivenTests: XCTestCase {
                formatter.dateFormat = "dd-MM-yyyy"
                let expectedDate = formatter.date(from: expectedDateStr)
                
-                // Sadece gün karşılaştırması yapalım (saat farkı olmaksızın)
-                let date1 = invoice.date.map { formatter.string(from: $0) }
-                let date2 = expectedDate.map { formatter.string(from: $0) }
-                
-                XCTAssertEqual(date1, date2, "Tarih Uyuşmazlığı - ID: \(testCase.id)")
+               let date1 = invoice.date.map { formatter.string(from: $0) }
+               let date2 = expectedDate.map { formatter.string(from: $0) }
+               
+               XCTAssertEqual(date1, date2, "Tarih Uyuşmazlığı - ID: \(testCase.id)")
             }
             
             // Tutar
