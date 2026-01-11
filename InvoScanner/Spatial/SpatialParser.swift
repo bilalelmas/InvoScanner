@@ -77,11 +77,18 @@ struct SpatialParser {
         
         // Satıcı
         if let sellerBlock = layoutMap.leftBlock(withLabel: .seller) {
-            result.supplier = extractSupplierName(from: sellerBlock.text)
+            let extracted = extractSupplierName(from: sellerBlock.text)
+            // V6: Geçerlilik kontrolü - geçersizse fallback'e git
+            if let name = extracted, isValidSupplierName(name) {
+                result.supplier = name
+            }
         }
         // Fallback 1: VKN/TCKN ile tespit
         if result.supplier == nil {
-            result.supplier = extractSupplierViaVKN(from: fullText)
+            let extracted = extractSupplierViaVKN(from: fullText)
+            if let name = extracted, isValidSupplierName(name) {
+                result.supplier = name
+            }
         }
         // Fallback 2: Şahıs faturaları için - buyer bloğunun ilk satırı
         if result.supplier == nil {
@@ -149,9 +156,11 @@ struct SpatialParser {
     }
     
     private func extractSupplierName(from text: String) -> String? {
+        // V6: Satır bazlı önce temizle, sonra filtrele
         let lines = text.components(separatedBy: .newlines)
+            .map { cleanSellerLabel($0) }  // ÖNCELİKLE etiketleri temizle
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+            .filter { !$0.isEmpty && !isLabelOnlyLine($0) }
         
         // V5.2 FIX: Adres başlangıç anahtar kelimeleri - bunları görünce DUR
         let addressBreakWords = [
@@ -334,6 +343,54 @@ struct SpatialParser {
             options: .regularExpression
         )
         return cleaned.trimmingCharacters(in: .whitespaces)
+    }
+    
+    /// V6: Satıcı adı geçerliliğini kontrol eder
+    /// Geçersiz sonuçlar fallback'i tetikler
+    private func isValidSupplierName(_ name: String) -> Bool {
+        // Minimum uzunluk
+        guard name.count >= 4 else { return false }
+        
+        // Bilinen geçersiz pattern'ler
+        let invalidPatterns = [
+            #"^Vergi\s*Dairesi"#,
+            #"^VD\s*:"#,
+            #"^V\.D\.\s*:"#,
+            #"^[Ss][Aa][Tt][ıİIi][Cc][ıİIi]\s*\("#,  // "Satıcı (" etiket kaldı
+            #"^TCKN\s*:"#,
+            #"^VKN\s*:"#,
+            #"^Tel\s*:"#,
+            #"^\d{9,11}$"#  // Sadece sayı
+        ]
+        
+        for pattern in invalidPatterns {
+            if name.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                return false
+            }
+        }
+        return true
+    }
+    
+    /// V6: Sadece etiket içeren satırları tespit eder (filtrele)
+    private func isLabelOnlyLine(_ line: String) -> Bool {
+        let labelPatterns = [
+            #"^Vergi\s*Dairesi\s*:"#,
+            #"^VD\s*:"#,
+            #"^V\.D\.\s*:"#,
+            #"^TCKN\s*:"#,
+            #"^VKN\s*:"#,
+            #"^Tel\s*:"#,
+            #"^Telefon\s*:"#,
+            #"^FAX\s*:"#,
+            #"^E-?[Pp]osta\s*:"#,
+            #"^Web\s*Sitesi\s*:"#,
+            #"^Adres\s*:"#,
+            #"^MERSIS\s*(NO)?\s*:"#
+        ]
+        
+        return labelPatterns.contains { pattern in
+            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
     }
     
     /// V5.2 Final Polish: Legal suffix sonrasındaki garbage'ı temizler
