@@ -103,4 +103,39 @@ struct ExtractionConstants {
         "E-ARSIV", "E-ARŞİV",
         "FATURA", "FATURA NO"
     ]
+    
+    // MARK: - V5.3 Semantik Etiketler
+    
+    /// Satıcı bölümü işaretçileri (Moonlife, Vestel varyasyonları dahil)
+    static let sellerLabels = [
+        "SATICI", "SATICI:", "SATICI (MERKEZ):", "SATICI(MERKEZ):",
+        "İŞLETME MERKEZİ", "ISLETME MERKEZI",
+        "SATICININ", "SATICININ:"
+    ]
+    
+    /// Alıcı bölümü işaretçileri (Hepsiburada varyasyonu dahil)
+    static let buyerLabels = [
+        "ALICI", "ALICI:", "ALICI (ŞUBE):", "ALICI(ŞUBE):",
+        "MÜŞTERİ V.D. VKN/TCKN", "MUSTERI V.D. VKN/TCKN",
+        "MÜŞTERİ VD VKN", "MUSTERI VD VKN"
+    ]
+    
+    /// Fatura meta veri etiketleri
+    static let invoiceMetaLabels = [
+        "FATURA NO", "FATURA NO:", "FATURA NUMARASI", "FATURA NUMARASI:",
+        "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
+        "DÜZENLENME SAATİ", "DUZENLEME SAATI", "DÜZENLEME SAATİ"
+    ]
+    
+    /// V5.3: Marka sloganları ve gürültü ifadeleri (satıcı adı temizliği için)
+    static let sloganNoise = [
+        // Marka sloganları
+        "YEŞİLİ BİRLİKTE YAŞATALIM", "YESILI BIRLIKTE YASATALIM",
+        "GÜVENİLİR ALIŞVERİŞ", "GUVENILIR ALISVERIS",
+        "GÜVENİL ALIŞVERİŞ", "GUVENIL ALISVERIS",
+        "MOBİLYA AŞKI", "MOBILYA ASKI",
+        // Sayfa numaraları
+        "SAYFA 1", "SAYFA 1/1", "PAGE 1", "PAGE 1/1",
+        "SAYFA:", "PAGE:"
+    ]
 }

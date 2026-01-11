@@ -47,6 +47,8 @@ public struct BlockLabeler {
     
     /// Seller block signals with weights
     private let sellerSignals: [(keyword: String, weight: Double)] = [
+        // V5.3+ FIX: Explicit seller label
+        ("SATICI", 50),  // "Satıcı (Merkez):" vb.
         ("VKN", 30),
         ("VERGI KIMLIK", 30),
         ("MERSIS", 25),
@@ -253,6 +255,12 @@ public struct BlockLabeler {
         
         // Content Score: Buyer keywords
         score += calculateContentScore(text: text, signals: buyerSignals)
+        
+        // V5.3+ FIX: "SATICI" kelimesi varsa bu buyer değil seller bloğu
+        // Örn: "Satıcı (Merkez): Moonlıfe Mobilya..." → Seller olmalı
+        if text.contains("SATICI") && !text.contains("ALICI") {
+            score -= 100 // Strong penalty - bu kesinlikle seller
+        }
         
         return max(0, score)
     }
