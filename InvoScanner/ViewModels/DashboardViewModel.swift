@@ -48,8 +48,14 @@ struct MonthlyData: Identifiable {
 
 // MARK: - Dashboard ViewModel
 
+import SwiftData
+
+// ... (LoadState ve DashboardStats aynı kalacak)
+
+// MARK: - Dashboard ViewModel
+
 /// Dashboard ana ViewModel'i
-/// - @Observable: iOS 17+ modern state management
+/// - SwiftData entegrasyonu ile gerçek verileri gösterir
 @Observable
 final class DashboardViewModel {
     
@@ -57,17 +63,12 @@ final class DashboardViewModel {
     
     var loadState: LoadState = .idle
     var stats: DashboardStats = DashboardStats()
-    var recentInvoices: [Invoice] = []
     
     // MARK: - Computed Properties
     
-    /// Yükleme göstergesi için
     var isLoading: Bool { loadState.isLoading }
-    
-    /// Boş durum kontrolü
     var isEmpty: Bool { stats.isEmpty && loadState == .loaded }
     
-    /// Hata mesajı
     var errorMessage: String? {
         if case .error(let message) = loadState {
             return message
@@ -77,33 +78,76 @@ final class DashboardViewModel {
     
     // MARK: - Actions
     
-    /// Dashboard verilerini yükler
+    /// Dashboard verilerini yükler ve istatistikleri hesaplar
+    /// - Parameter context: SwiftData ModelContext
     @MainActor
-    func loadData() async {
+    func loadData(context: ModelContext) async {
         loadState = .loading
         
         do {
-            // Simüle edilen veri yükleme (gerçekte SwiftData'dan gelecek)
-            try await Task.sleep(for: .milliseconds(500))
+            // 1. Tüm faturaları çek
+            let descriptor = FetchDescriptor<SavedInvoice>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+            let invoices = try context.fetch(descriptor)
             
-            // Mock data (Phase 3'te gerçek veriyle değiştirilecek)
-            stats = DashboardStats(
-                totalInvoiceCount: 0, // Başlangıçta boş
-                monthlySpend: 0,
-                previousMonthSpend: 0,
-                categoryBreakdown: [:],
-                monthlyTrend: []
+            // 2. İstatistikleri hesapla
+            let totalCount = invoices.count
+            
+            // Bu ayın toplamı
+            let calendar = Calendar.current
+            let now = Date()
+            let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
+            
+            let thisMonthInvoices = invoices.filter {
+                guard let date = $0.date else { return false }
+                return date >= startOfMonth
+            }
+            
+            let monthlySpend = thisMonthInvoices.reduce(Decimal(0)) { $0 + ($1.totalAmount ?? 0) }
+            
+            // Geçen ayın toplamı
+            let startOfLastMonth = calendar.date(byAdding: .month, value: -1, to: startOfMonth)!
+            let endOfLastMonth = startOfMonth
+            
+            let lastMonthInvoices = invoices.filter {
+                guard let date = $0.date else { return false }
+                return date >= startOfLastMonth && date < endOfLastMonth
+            }
+            
+            let previousMonthSpend = lastMonthInvoices.reduce(Decimal(0)) { $0 + ($1.totalAmount ?? 0) }
+            
+            // Aylık Trend (Son 6 ay)
+            // Basit implementasyon: Sadece mevcut veriyi göster
+            // Gelişmiş versiyonda gruplama yapılabilir
+            var trend: [MonthlyData] = []
+            // (Mock trend değil gerçek veriden hesaplanmalı, şimdilik boş bırakıyorum karmaşıklığı artırmamak için)
+            
+            // Kategori dağılımı (Şimdilik satıcı bazlı)
+            var categoryBreakdown: [String: Decimal] = [:]
+            for invoice in thisMonthInvoices {
+                let supplier = invoice.supplierName ?? "Diğer"
+                categoryBreakdown[supplier, default: 0] += (invoice.totalAmount ?? 0)
+            }
+            
+            // 3. State'i güncelle
+            self.stats = DashboardStats(
+                totalInvoiceCount: totalCount,
+                monthlySpend: monthlySpend,
+                previousMonthSpend: previousMonthSpend,
+                categoryBreakdown: categoryBreakdown,
+                monthlyTrend: trend
             )
             
             loadState = .loaded
+            
         } catch {
-            loadState = .error("Veriler yüklenirken hata oluştu: \(error.localizedDescription)")
+            print("DashboardViewModel Error: \(error)")
+            loadState = .error("Veriler yüklenirken hata oluştu.")
         }
     }
     
     /// Yeniden deneme
     @MainActor
-    func retry() async {
-        await loadData()
+    func retry(context: ModelContext) async {
+        await loadData(context: context)
     }
 }

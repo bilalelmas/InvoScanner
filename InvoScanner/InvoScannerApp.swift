@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct InvoScannerApp: App {
@@ -13,5 +14,7 @@ struct InvoScannerApp: App {
         WindowGroup {
             ContentView()
         }
+        // SwiftData: Fatura verilerini kalıcı olarak saklamak için model container
+        .modelContainer(for: SavedInvoice.self)
     }
 }

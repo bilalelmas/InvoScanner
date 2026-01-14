@@ -9,6 +9,7 @@ import Charts
 /// - LoadState yönetimi
 struct DashboardView: View {
     
+    @Environment(\.modelContext) private var modelContext
     @State private var viewModel = DashboardViewModel()
     @State private var showScanner = false
     @State private var showGallery = false
@@ -46,7 +47,7 @@ struct DashboardView: View {
                 }
             }
             .task {
-                await viewModel.loadData()
+                await viewModel.loadData(context: modelContext)
             }
             .sheet(isPresented: $showScanner) {
                 // DocumentCameraView entegrasyonu yapılacak
@@ -221,7 +222,7 @@ struct DashboardView: View {
                 .multilineTextAlignment(.center)
             
             Button("Tekrar Dene") {
-                Task { await viewModel.retry() }
+                Task { await viewModel.retry(context: modelContext) }
             }
             .buttonStyle(.borderedProminent)
         }

@@ -1,13 +1,19 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Invoice Detail View
 
 /// Fatura detay ve düzenleme görünümü
 /// - Split View: Görsel + Form
-/// - Immutable Snapshot: Rollback desteği için orijinal veri
+/// - Hibrit Depolama: Görsel disk'e, metadata SwiftData'ya kaydedilir
 struct InvoiceDetailView: View {
     
     let invoice: Invoice
+    let scannedImage: UIImage?
+    
+    // MARK: - SwiftData
+    
+    @Environment(\.modelContext) private var modelContext
     
     // MARK: - State
     
@@ -23,14 +29,19 @@ struct InvoiceDetailView: View {
     /// Alert gösterimi
     @State private var showDiscardAlert = false
     
+    /// Kaydetme durumu
+    @State private var showSaveSuccess = false
+    @State private var isSaving = false
+    
     @Environment(\.dismiss) private var dismiss
     
     // MARK: - Init
     
-    init(invoice: Invoice) {
+    init(invoice: Invoice, scannedImage: UIImage? = nil) {
         self.invoice = invoice
+        self.scannedImage = scannedImage
         self._editableInvoice = State(initialValue: invoice)
-        self.originalSnapshot = invoice // Immutable snapshot
+        self.originalSnapshot = invoice
     }
     
     var body: some View {
@@ -55,6 +66,10 @@ struct InvoiceDetailView: View {
                                 .frame(height: 250)
                             
                             formContent
+                            
+                            // Kaydet Butonu (Floating)
+                            saveButton
+                                .padding(.top, 20)
                         }
                         .padding()
                     }
@@ -81,8 +96,8 @@ struct InvoiceDetailView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     if isEditing {
-                        Button("Kaydet") {
-                            saveChanges()
+                        Button("Tamam") {
+                            isEditing = false
                         }
                         .fontWeight(.semibold)
                     } else {
@@ -100,6 +115,13 @@ struct InvoiceDetailView: View {
             } message: {
                 Text("Yaptığınız değişiklikler kaybolacak.")
             }
+            .alert("Başarılı!", isPresented: $showSaveSuccess) {
+                Button("Tamam") {
+                    dismiss()
+                }
+            } message: {
+                Text("Fatura başarıyla kaydedildi.")
+            }
         }
     }
     
@@ -110,18 +132,49 @@ struct InvoiceDetailView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
             
-            // TODO: Gerçek PDF/Görsel önizlemesi eklenecek
-            VStack(spacing: 12) {
-                Image(systemName: "doc.text.image")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
-                
-                Text("Fatura Önizlemesi")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let image = scannedImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "doc.text.image")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Fatura Önizlemesi")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    // MARK: - Save Button
+    
+    private var saveButton: some View {
+        Button {
+            saveToDatabase()
+        } label: {
+            HStack {
+                if isSaving {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                Text(isSaving ? "Kaydediliyor..." : "Faturayı Kaydet")
+            }
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(isSaving ? Color.gray : Color.blue)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .disabled(isSaving)
     }
     
     // MARK: - Form Content
@@ -136,7 +189,7 @@ struct InvoiceDetailView: View {
                         set: { editableInvoice.supplierName = $0.isEmpty ? nil : $0 }
                     ))
                 } else {
-                    LabeledContent("Satıcı", value: invoice.supplierName ?? "Bilinmiyor")
+                    LabeledContent("Satıcı", value: editableInvoice.supplierName ?? "Bilinmiyor")
                 }
             }
             
@@ -150,7 +203,7 @@ struct InvoiceDetailView: View {
                                ), 
                                displayedComponents: .date)
                 } else {
-                    LabeledContent("Tarih", value: invoice.date?.formatted(date: .long, time: .omitted) ?? "Bilinmiyor")
+                    LabeledContent("Tarih", value: editableInvoice.date?.formatted(date: .long, time: .omitted) ?? "Bilinmiyor")
                 }
             }
             
@@ -168,20 +221,20 @@ struct InvoiceDetailView: View {
                         .multilineTextAlignment(.trailing)
                     }
                 } else {
-                    LabeledContent("Toplam", value: invoice.totalAmount?.formatted(.currency(code: "TRY")) ?? "Bilinmiyor")
+                    LabeledContent("Toplam", value: editableInvoice.totalAmount?.formatted(.currency(code: "TRY")) ?? "Bilinmiyor")
                 }
             }
             
             // ETTN
             Section("Yasal Bilgiler") {
-                if let ettn = invoice.ettn {
+                if let ettn = editableInvoice.ettn {
                     LabeledContent("ETTN", value: ettn.uuidString)
                         .font(.caption)
                 } else {
                     LabeledContent("ETTN", value: "Bulunamadı")
                 }
                 
-                if let invoiceNo = invoice.invoiceNumber {
+                if let invoiceNo = editableInvoice.invoiceNumber {
                     LabeledContent("Fatura No", value: invoiceNo)
                 }
             }
@@ -191,11 +244,11 @@ struct InvoiceDetailView: View {
                 HStack {
                     Text("Güven Skoru")
                     Spacer()
-                    Text(String(format: "%.0f%%", invoice.confidenceScore * 100))
-                        .foregroundStyle(invoice.isAutoAccepted ? .green : .orange)
+                    Text(String(format: "%.0f%%", editableInvoice.confidenceScore * 100))
+                        .foregroundStyle(editableInvoice.isAutoAccepted ? .green : .orange)
                     
-                    Image(systemName: invoice.isAutoAccepted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(invoice.isAutoAccepted ? .green : .orange)
+                    Image(systemName: editableInvoice.isAutoAccepted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(editableInvoice.isAutoAccepted ? .green : .orange)
                 }
             }
         }
@@ -222,9 +275,27 @@ struct InvoiceDetailView: View {
         isEditing = false
     }
     
-    private func saveChanges() {
-        // TODO: SwiftData'ya kaydet
-        isEditing = false
+    /// Faturayı SwiftData'ya kaydet (Hibrit Depolama)
+    private func saveToDatabase() {
+        isSaving = true
+        
+        Task {
+            // 1. Görseli disk'e kaydet (Hibrit Depolama)
+            var imageFileName: String? = nil
+            if let image = scannedImage {
+                imageFileName = ImageStorageService.shared.save(image: image, id: UUID())
+            }
+            
+            // 2. SavedInvoice oluştur ve kaydet
+            let savedInvoice = SavedInvoice(from: editableInvoice, imageFileName: imageFileName)
+            
+            await MainActor.run {
+                modelContext.insert(savedInvoice)
+                
+                isSaving = false
+                showSaveSuccess = true
+            }
+        }
     }
 }
 
@@ -238,5 +309,5 @@ struct InvoiceDetailView: View {
     previewInvoice.supplierName = "TRENDYOL HIZLI TESLİMAT"
     
     return InvoiceDetailView(invoice: previewInvoice)
+        .modelContainer(for: SavedInvoice.self, inMemory: true)
 }
-
