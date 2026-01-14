@@ -150,17 +150,19 @@ public struct BlockLabeler {
         let lineCount = block.children.count
         
         // ──────────────────────────────────────────────────────────────
-        // PRIORITY 1: ETTN (UUID Detection) - WITH SELLER PROTECTION
+        // PRIORITY 1: ETTN (UUID Detection) - POSITION INDEPENDENT
         // ──────────────────────────────────────────────────────────────
-        // V5.1 FIX: Uzun bloklar (3+ satır) kurumsal kelimeler içeriyorsa
-        // UUID olsa bile seller olarak etiketle
+        // V5.5: UUID formatı içeren bloklar, konumu ne olursa olsun (sağ, sol, alt, üst)
+        // ETTN olarak etiketlenir. Sadece satıcı bloğu istisnası korunur.
         if containsUUID(text) {
-            // Koruma: Uzun blok ve satıcı sinyalleri varsa seller olarak işaretle
+            // Koruma: Uzun blok (3+ satır) ve 2+ satıcı anahtar kelimesi varsa
+            // Bu muhtemelen satıcı bilgileri bloğu, ETTN ayrı çıkarılacak
             let sellerKeywordCount = countSellerKeywords(in: text)
             if lineCount >= 3 && sellerKeywordCount >= 2 {
-                // Bu bir satıcı bloğu, içindeki ETTN ayrı bir blok değil
-                // Seller olarak devam et, ETTN olarak işaretleme
+                // Satıcı bloğu olarak devam et, ETTN olarak işaretleme
+                // ETTN küresel arama ile yakalanacak
             } else {
+                // V5.5: Konum kontrolü YOK - UUID varsa ETTN'dir
                 return .ettn
             }
         }
@@ -183,7 +185,7 @@ public struct BlockLabeler {
         scores[.totals] = calculateTotalsScore(text: text, position: center)
         
         // Noise Score
-        scores[.noise] = calculateNoiseScore(text: text)
+        scores[.noise] = calculateNoiseScore(text: text, position: center)
         
         // ──────────────────────────────────────────────────────────────
         // DECISION: Select label with highest score
@@ -209,7 +211,7 @@ public struct BlockLabeler {
     /// **Position Bonus:** Top-Left quadrant (y < topThreshold, x < 0.5)
     /// **Content Bonus:** VKN, MERSIS, corporate suffixes
     /// **Multi-Keyword Bonus:** 3+ seller keywords = override position
-    /// **Negative Penalty:** Contains buyer signals
+    /// **Negative Penalty:** Contains buyer signals or cargo keywords
     private func calculateSellerScore(text: String, position: CGPoint, lineCount: Int = 1) -> Double {
         var score: Double = 0
         
@@ -236,6 +238,16 @@ public struct BlockLabeler {
         let buyerPenalty = calculateContentScore(text: text, signals: buyerSignals)
         if buyerPenalty > 0 {
             score -= buyerPenalty * 1.5 // Strong penalty
+        }
+        
+        // V5.12 GENEL KURAL: Lojistik firmaları Asla Satıcı Olamaz
+        // Bu kural tüm kargo firmaları için geçerlidir.
+        let logisticKeywords = ["GÖNDERİ TAŞIYAN", "GONDERI TASIYAN", "TAŞIYAN", "TASIYAN",
+                                "KARGO", "LOJİSTİK", "LOJISTIK", "NAKLİYE", "NAKLIYE", "DAĞITIM", "DAGITIM"]
+        for keyword in logisticKeywords {
+            if text.contains(keyword) {
+                return -1000.0 // Kesin Ret
+            }
         }
         
         return max(0, score)
@@ -308,9 +320,24 @@ public struct BlockLabeler {
     /// Calculates noise candidate score.
     ///
     /// **Content-Only:** IBAN, BANKA, QR markers
+    /// **V5.3:** Top margin isolated numbers (Y < 0.10) are noise
     /// No strong position signal (can be anywhere)
-    private func calculateNoiseScore(text: String) -> Double {
-        return calculateContentScore(text: text, signals: noiseSignals)
+    private func calculateNoiseScore(text: String, position: CGPoint? = nil) -> Double {
+        var score = calculateContentScore(text: text, signals: noiseSignals)
+        
+        // V5.3: Tepe bölgesi izole sayı tespiti
+        // Y < 0.10 ve salt sayı ise bu muhtemelen barkod/tracking number
+        if let pos = position, pos.y < ExtractionConstants.topMarginNoiseThreshold {
+            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let digitsOnly = trimmedText.filter { $0.isNumber }
+            
+            // Salt sayı bloğu ve 9+ hane (barkod/tracking formatı)
+            if trimmedText == digitsOnly && digitsOnly.count >= 9 {
+                score += 100 // Çok yüksek noise skoru
+            }
+        }
+        
+        return score
     }
     
     // MARK: - Helper Methods

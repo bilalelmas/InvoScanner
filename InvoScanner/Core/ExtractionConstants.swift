@@ -40,6 +40,62 @@ struct ExtractionConstants {
         "HIZMETLERI", "HİZMETLERİ"
     ]
     
+    /// V5.12: Şirket türü sonekleri - Tam Sıralı Liste (En Uzun -> En Kısa)
+    /// Bu liste, satıcı isminin "Bitiş Çizgisini" belirler.
+    static let legalSuffixesOrdered = [
+        // 1. En Uzun Varyasyonlar (Kesinlik %100)
+        "SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+        "SANAYI VE TICARET LIMITED SIRKETI",
+        "SANAYİ VE TİCARET ANONİM ŞİRKETİ",
+        "SANAYI VE TICARET ANONIM SIRKETI",
+        "TİCARET VE SANAYİ LİMİTED ŞİRKETİ",
+        "TICARET VE SANAYI LIMITED SIRKETI",
+        "DIŞ TİCARET LİMİTED ŞİRKETİ",
+        "DIS TICARET LIMITED SIRKETI",
+        "PAZARLAMA LİMİTED ŞİRKETİ",
+        "PAZARLAMA LIMITED SIRKETI",
+        "HİZMETLERİ LİMİTED ŞİRKETİ",
+        "HIZMETLERI LIMITED SIRKETI",
+        "MAĞAZACILIK LİMİTED ŞİRKETİ",
+        "MAGAZACILIK LIMITED SIRKETI",
+        
+        // 2. Orta Varyasyonlar (SAN. VE TİC. kombinasyonları)
+        "SAN. VE TİC. LTD. ŞTİ.",
+        "SAN. VE TIC. LTD. STI.",
+        "SANAYİ VE TİCARET A.Ş.",
+        "SANAYI VE TICARET A.S.",
+        "SAN. VE TİC. A.Ş.",
+        "SAN. VE TIC. A.S.",
+        
+        // 3. Orta Varyasyonlar (Temel formlar)
+        "LİMİTED ŞİRKETİ",
+        "LIMITED SIRKETI",
+        "ANONİM ŞİRKETİ",
+        "ANONIM SIRKETI",
+        "TİCARET A.Ş.",
+        "TICARET A.S.",
+        "TİC. A.Ş.",
+        "TIC. A.S.",
+        "LTD. ŞTİ.",
+        "LTD. STI.",
+        "LTD.ŞTİ.",
+        "LTD.STI.",
+        "LTD ŞTİ",
+        "LTD STI",
+        
+        // 4. Kısa formlar (Dikkatli Kullanılmalı)
+        "A.Ş.",
+        "A.S.",
+        "AŞ.",
+        "AS.",
+        "A.Ş",
+        "A.S",
+        "LTD.",
+        "LTD",
+        "ŞTİ.",
+        "STI."
+    ]
+    
     /// Vergi ve yasal kimlik işaretçileri
     static let taxIndicators = [
         "VKN", "VKN:", "VERGI NO", "VERGİ NO",
@@ -123,8 +179,17 @@ struct ExtractionConstants {
     /// Fatura meta veri etiketleri
     static let invoiceMetaLabels = [
         "FATURA NO", "FATURA NO:", "FATURA NUMARASI", "FATURA NUMARASI:",
+        "BELGE NO", "BELGE NO:",  // V5.3: Belge numarası varyasyonu
         "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
         "DÜZENLENME SAATİ", "DUZENLEME SAATI", "DÜZENLEME SAATİ"
+    ]
+    
+    /// V5.4: Tarih etiketleri (tarih çıkarma için)
+    static let dateLabels = [
+        "FATURA TARİHİ", "FATURA TARIHI",
+        "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
+        "TARİH", "TARIH",
+        "DATE"
     ]
     
     /// V5.3: Marka sloganları ve gürültü ifadeleri (satıcı adı temizliği için)
@@ -138,4 +203,10 @@ struct ExtractionConstants {
         "SAYFA 1", "SAYFA 1/1", "PAGE 1", "PAGE 1/1",
         "SAYFA:", "PAGE:"
     ]
+    
+    // MARK: - V5.3 Spatial Thresholds
+    
+    /// Tepe bölgesi gürültü eşiği (Y < bu değer = tepe bölgesi)
+    /// Bu bölgedeki izole sayılar potansiyel gürültü olarak işaretlenir
+    static let topMarginNoiseThreshold: CGFloat = 0.10
 }

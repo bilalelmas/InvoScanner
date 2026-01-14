@@ -57,11 +57,16 @@ struct SpatialParser {
         // Tüm metin (fallback için)
         let fullText = blocks.map { $0.text }.joined(separator: "\n")
         
-        // ETTN (herhangi bir blokta olabilir)
-        if let ettnBlock = layoutMap.allBlocks.first(where: { $0.label == .ettn }) {
+        // V5.5: ETTN Küresel Arama (DSM Fix)
+        // ETTN her yerde olabilir - önce tüm metinde ara (en güvenilir yöntem)
+        result.ettn = extractETTN(from: fullText)
+        
+        // Fallback 1: Eğer tüm metinde bulunamadıysa, etiketli bloklarda ara
+        if result.ettn == nil, let ettnBlock = layoutMap.allBlocks.first(where: { $0.label == .ettn }) {
             result.ettn = extractETTN(from: ettnBlock.text)
         }
-        // Fallback 1: Unknown bloklarda ara (ETTN bazen unknown olarak etiketlenebilir)
+        
+        // Fallback 2: Unknown bloklarda ara (ETTN bazen unknown olarak etiketlenebilir)
         if result.ettn == nil {
             for block in layoutMap.allBlocks where block.label == .unknown {
                 if let ettn = extractETTN(from: block.text) {
@@ -69,10 +74,6 @@ struct SpatialParser {
                     break
                 }
             }
-        }
-        // Fallback 2: Tüm metinde ara
-        if result.ettn == nil {
-            result.ettn = extractETTN(from: fullText)
         }
         
         // Satıcı
@@ -138,15 +139,30 @@ struct SpatialParser {
     // MARK: - Extraction Helpers
     
     private func extractETTN(from text: String) -> String? {
-        // V5.3++ FIX: Satır kırılmış UUID'leri de yakala
-        // Örn: "ETTN:F09DEE46-FF86-C7F1-8102-\n005056876266"
+        // V5.6 FIX: PDF Ligature Temizliği (Kritik: 'ﬀ' -> 'ff')
+        // PDF'lerden gelen tipografik birleşmeler UUID regex'i bozar
         let cleanText = text
+            .replacingOccurrences(of: "ﬀ", with: "ff")  // Ligature: ff
+            .replacingOccurrences(of: "ﬁ", with: "fi")  // Ligature: fi
+            .replacingOccurrences(of: "ﬂ", with: "fl")  // Ligature: fl
+            .replacingOccurrences(of: "ﬃ", with: "ffi") // Ligature: ffi
+            .replacingOccurrences(of: "ﬄ", with: "ffl") // Ligature: ffl
             .replacingOccurrences(of: "\n", with: "")
             .replacingOccurrences(of: "\r", with: "")
             .replacingOccurrences(of: " ", with: "")
+            .uppercased() // Regex için hepsini büyük harf yap
         
-        let pattern = "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        // V5.4: Önce ETTN etiketli pattern'i dene (daha güvenilir)
+        let labeledPattern = "(?:ETTN|ETTV)[:]?([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})"
+        if let regex = try? NSRegularExpression(pattern: labeledPattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText)),
+           let captureRange = Range(match.range(at: 1), in: cleanText) {
+            return String(cleanText[captureRange])
+        }
+        
+        // Fallback: Herhangi bir UUID pattern'i (ETTN etiketi olmadan)
+        let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+        guard let regex = try? NSRegularExpression(pattern: uuidPattern) else { return nil }
         
         let range = NSRange(cleanText.startIndex..., in: cleanText)
         if let match = regex.firstMatch(in: cleanText, range: range) {
@@ -155,88 +171,130 @@ struct SpatialParser {
         return nil
     }
     
+    /// V5.12 GENEL ÇÖZÜM: Satıcı ismini ayıklar ve temizler (Akıllı Makas Mimarisi)
     private func extractSupplierName(from text: String) -> String? {
-        // V6: Satır bazlı önce temizle, sonra filtrele
+        // 1. Satır Satır Analiz (Line-by-Line Analysis)
         let lines = text.components(separatedBy: .newlines)
-            .map { cleanSellerLabel($0) }  // ÖNCELİKLE etiketleri temizle
+            .map { cleanSellerLabel($0) }
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !isLabelOnlyLine($0) }
         
-        // V5.2 FIX: Adres başlangıç anahtar kelimeleri - bunları görünce DUR
-        let addressBreakWords = [
-            "MAH", "MAHALLE", "CAD", "CADDE", "SOK", "SOKAK", "BULVAR",
-            "NO:", "KAT:", "DAİRE", "DAIRE", "APT", "APARTMAN"
+        // V5.12: İsmi bitiren "Terminatör" kelimeler
+        let terminators = [
+            // Adres etiketleri
+            "ADRES", "ADRES:",
+            // Mahalle/Cadde/Sokak
+            "MAH.", "MAHALLE", "MAHALLESİ", "MAHALLESI",
+            "CAD.", "CADDE", "CADDESİ", "CADDESI",
+            "SOK.", "SOKAK", "SOKAĞI", "SOKAGI",
+            "BULVAR", "MEYDAN",
+            // Yapı bilgileri
+            "NO:", "KAT:", "DAİRE", "DAIRE", "APT", "BLOK", "PK:",
+            // İletişim
+            "TEL:", "VKN:", "TCKN:", "VERGİ", "VERGI", "WEB", "E-POSTA",
+            // İl isimleri (adres başlangıcı)
+            "İSTANBUL", "ISTANBUL", "ANKARA", "İZMİR", "IZMIR", "KOCAELİ", "KOCAELI",
+            "BURSA", "ANTALYA", "ADANA", "KONYA", "GAZİANTEP", "GAZIANTEP",
+            // Lojistik kelimeleri (asla isimde olmamalı)
+            "TAŞIYAN", "TASIYAN", "KARGO", "LOJİSTİK", "LOJISTIK", "NAKLİYE", "NAKLIYE"
         ]
         
-        // V5.2 Final Polish: Genişletilmiş noise/atlama listesi
+        // Gürültü kelimeleri
         var noiseWords = [
-            // Vergi bilgileri
             "VERGİ DAİRESİ", "VERGI DAIRESI", "VD:", "V.D.",
-            // İletişim
-            "TEL:", "TELEFON", "FAX:", "E-POSTA", "EPOSTA", "E-MAIL", "MAILTO:",
-            // Konum (NOT: "MERKEZ" kaldırıldı - "Satıcı (Merkez):" etiketini bozuyor)
-            "İLÇE", "ILCE", "İL:", "IL:",
-            // Fatura başlıkları (yeni)
-            "E-ARŞİV", "E-ARSIV", "E-FATURA", "E-İRSALİYE",
-            "ARŞİV FATURA", "ARSIV FATURA",
-            // Alıcı işaretleri
             "SAYIN", "SAYIN:", "ALICI", "ALICI:",
-            "ADRES:", "ADRES :",
-            // Diğer
+            "E-ARŞİV", "E-ARSIV", "E-FATURA",
             "MERSIS NO", "MERSİS NO"
         ]
-        // V5.3: Marka sloganlarını gürültü listesine ekle
         noiseWords.append(contentsOf: ExtractionConstants.sloganNoise)
-        
-        // V5.1 FIX: Tam kelime eşleşme için suffix'ler
-        let legalSuffixes = [" A.Ş", " AŞ", " LTD", " ŞTİ", " STI", " A.S.", " LTD.", ".Ş.", ".ş."]
         
         var nameParts: [String] = []
         
         for line in lines {
-            let upperLine = line.uppercased()
+            let upperLine = line.uppercased(with: Locale(identifier: "tr_TR"))
             
-            // V5.2 FIX: Adres başladığı an DUR - sonraki satırları toplama
-            var isAddressStart = false
-            for word in addressBreakWords {
-                if upperLine.hasPrefix(word) || upperLine.contains(" \(word)") {
-                    isAddressStart = true
+            // Posta kodu kontrolü (beş haneli sayı ile başlayan satır = adres)
+            if upperLine.range(of: #"^\d{5}\b"#, options: .regularExpression) != nil {
+                break
+            }
+            
+            // Satır tamamen gürültü mü?
+            if isNoiseLine(upperLine, prefixes: noiseWords) { continue }
+            
+            // V5.12: Satır İÇİNDE terminatör var mı?
+            var cleanLine = line
+            var foundTerminator = false
+            
+            for term in terminators {
+                // Boşlukla başlayan kelimeyi ara (kelime sınırı)
+                if let range = upperLine.range(of: " " + term) {
+                    // Terminatörden ÖNCESİNİ al
+                    let cutIndex = line.index(line.startIndex, offsetBy: upperLine.distance(from: upperLine.startIndex, to: range.lowerBound))
+                    cleanLine = String(line[..<cutIndex]).trimmingCharacters(in: .whitespaces)
+                    foundTerminator = true
+                    break
+                }
+                // Satır başında da kontrol et
+                if upperLine.hasPrefix(term) {
+                    cleanLine = ""
+                    foundTerminator = true
                     break
                 }
             }
-            if isAddressStart { break } // Döngüyü tamamen kır
             
-            // V5.2 Final Polish: Noise satırını atla
-            if isNoiseLine(upperLine, prefixes: noiseWords) { continue }
+            // Temizlenmiş satır boşsa
+            if cleanLine.isEmpty {
+                if foundTerminator { break }
+                continue
+            }
             
-            // Legal suffix varsa bu kesin satıcı adı
-            for suffix in legalSuffixes {
-                if upperLine.hasSuffix(suffix.trimmingCharacters(in: .whitespaces)) ||
-                   upperLine.contains(suffix) {
-                    nameParts.append(line)
-                    // V5.2 Final Polish: Suffix truncation - Legal suffix sonrasını kes
-                    let result = nameParts.joined(separator: " ")
-                    // V5.3+ FIX: cleanLeadingNumbers burada da çağrılmalı
-                    return cleanLeadingNumbers(cleanSellerLabel(truncateAfterLegalSuffix(result)))
+            nameParts.append(cleanLine)
+            
+            // Terminatör bulunduysa döngüden çık
+            if foundTerminator { break }
+        }
+        
+        // 2. Birleştirilmiş ismi al
+        let fullName = nameParts.joined(separator: " ")
+        
+        // 3. Kurumsal Sonek Kontrolü (Hard Cut)
+        if !fullName.isEmpty {
+            return cleanLeadingNumbers(cleanSellerLabel(applyHardSuffixCut(fullName)))
+        }
+        
+        // 4. Şahıs ismi fallback (2-4 kelime, adres/kargo değil)
+        if let firstLine = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            let words = firstLine.split(separator: " ")
+            if words.count >= 2 && words.count <= 4 {
+                let upperFirst = firstLine.uppercased()
+                if !upperFirst.contains("MAH") && !upperFirst.contains("CAD") &&
+                   !upperFirst.contains("SOK") && !upperFirst.contains("NO:") &&
+                   !upperFirst.contains("KARGO") && !upperFirst.contains("TAŞIYAN") &&
+                   !upperFirst.contains("GÖNDERİ") {
+                    return cleanLeadingNumbers(cleanSellerLabel(firstLine))
                 }
             }
-            
-            // Potansiyel isim parçası olarak ekle
-            if line.count > 2 {
-                nameParts.append(line)
-            }
-        }
-        
-        // Birleştirilmiş ismi döndür
-        if !nameParts.isEmpty {
-            let result = nameParts.joined(separator: " ")
-            return cleanLeadingNumbers(cleanSellerLabel(truncateAfterLegalSuffix(result)))
-        }
-        
-        if let firstLine = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) {
             return cleanLeadingNumbers(cleanSellerLabel(firstLine))
         }
+        
         return nil
+    }
+    
+    /// V5.12: Sonek sonrası kesin kesim (Hard Cut)
+    private func applyHardSuffixCut(_ text: String) -> String {
+        let upperText = text.uppercased(with: Locale(identifier: "tr_TR"))
+        
+        for suffix in ExtractionConstants.legalSuffixesOrdered {
+            if let range = upperText.range(of: suffix) {
+                // Sonekin bittiği yer
+                let endIndex = range.upperBound
+                let originalEndIndex = text.index(text.startIndex, offsetBy: upperText.distance(from: upperText.startIndex, to: endIndex))
+                
+                // Soneke kadar al, gerisini çöpe at
+                return String(text[..<originalEndIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return text
     }
     
     /// V5.3++ FIX: Satıcı etiketi öneklerini temizler
@@ -393,16 +451,23 @@ struct SpatialParser {
         }
     }
     
-    /// V5.2 Final Polish: Legal suffix sonrasındaki garbage'ı temizler
-    /// Örn: "DSM GRUP TİCARET A.Ş. Mahalle Cad. No:5" -> "DSM GRUP TİCARET A.Ş."
+    /// V5.7 FIX: Legal suffix sonrasındaki her şeyi (adres başlangıcı dahil) kesin olarak temizler
+    /// Örn: "AS KARAKIZ... LİMİTED ŞİRKETİ YÜRÜKSELİM" -> "AS KARAKIZ... LİMİTED ŞİRKETİ"
+    /// Örn: "SALVANINI... LİMİTED ŞİRKETİ ÖMERLİ" -> "SALVANINI... LİMİTED ŞİRKETİ"
     private func truncateAfterLegalSuffix(_ text: String) -> String {
-        let suffixes = ["A.Ş.", "AŞ.", "A.Ş", "LTD.ŞTİ.", "LTD. ŞTİ.", "LTD.ŞTİ", "LTD ŞTİ", "LTD.", "ŞTİ.", "STI."]
-        let upperText = text.uppercased()
+        // V5.7: Türkçe locale ile büyük harf dönüşümü (ı→I, i→İ)
+        let upperText = text.uppercased(with: Locale(identifier: "tr_TR"))
         
-        for suffix in suffixes {
+        // En uzun eşleşmeyi bulmak için sıralı liste
+        for suffix in ExtractionConstants.legalSuffixesOrdered {
             if let range = upperText.range(of: suffix) {
+                // Sonekin bittiği yeri bul
                 let endIndex = range.upperBound
+                
+                // Orijinal metinde bu indexe karşılık gelen yer
                 let originalEndIndex = text.index(text.startIndex, offsetBy: upperText.distance(from: upperText.startIndex, to: endIndex))
+                
+                // V5.7: Kesin kesim - sadece soneke kadar olan kısmı al
                 return String(text[..<originalEndIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
@@ -503,8 +568,20 @@ struct SpatialParser {
         // Öncelik 2: Genel format [A-Z0-9]{2,3}\d{7,13}
         let generalPattern = try? NSRegularExpression(pattern: "[A-Z0-9]{2,3}\\d{7,13}", options: [])
         
-        // V5.3+ FIX: Tarih pattern - boşluklu formatları da destekle ("20- 08- 2024")
+        // V5.4: Tarih pattern - DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY formatları
         let datePattern = try? NSRegularExpression(pattern: #"\d{2}\s*[-./]\s*\d{2}\s*[-./]\s*\d{4}"#, options: [])
+        
+        // V5.4: Önce etiketli tarih ara (daha güvenilir)
+        // (?:Fatura|Düzenlenme)\s*Tarihi\s*[:]?\s*(\d{2}[./-]\d{2}[./-]\d{4})
+        let labeledDatePattern = #"(?:Fatura|Düzenlenme|FATURA|DÜZENLENME)\s*(?:Tarihi|TARİHİ|TARIHI)\s*[:]?\s*(\d{2}\s*[-./]\s*\d{2}\s*[-./]\s*\d{4})"#
+        if let regex = try? NSRegularExpression(pattern: labeledDatePattern, options: .caseInsensitive) {
+            let fullRange = NSRange(text.startIndex..., in: text)
+            if let match = regex.firstMatch(in: text, range: fullRange),
+               let captureRange = Range(match.range(at: 1), in: text) {
+                var dateStr = String(text[captureRange])
+                date = parseDate(dateStr)
+            }
+        }
         
         for line in lines {
             let range = NSRange(line.startIndex..., in: line)
@@ -513,7 +590,8 @@ struct SpatialParser {
             if invoiceNo == nil {
                 if let match = eArsivPattern?.firstMatch(in: line, range: range) {
                     let candidate = String(line[Range(match.range, in: line)!])
-                    if !isPhoneOrTCKN(candidate) {
+                    // V5.3: Gelişmiş validasyon
+                    if isValidInvoiceNumber(candidate) {
                         invoiceNo = candidate
                     }
                 }
@@ -523,43 +601,50 @@ struct SpatialParser {
             if invoiceNo == nil {
                 if let match = generalPattern?.firstMatch(in: line, range: range) {
                     let candidate = String(line[Range(match.range, in: line)!])
-                    if !isPhoneOrTCKN(candidate) {
+                    // V5.3: Gelişmiş validasyon
+                    if isValidInvoiceNumber(candidate) {
                         invoiceNo = candidate
                     }
                 }
             }
             
-            // Tarih
+            // V5.4: Fallback tarih - etiket bulunamadıysa herhangi bir tarih pattern'i
             if date == nil, let match = datePattern?.firstMatch(in: line, range: range) {
-                var dateStr = String(line[Range(match.range, in: line)!])
-                
-                // V5.3+ FIX: Boşlukları temizle ("20- 08- 2024" → "20-08-2024")
-                dateStr = dateStr.replacingOccurrences(of: " ", with: "")
-                
-                // V5.3 FIX: Tire veya boşlukla ayrılmış saat bilgisini temizle
-                // Örn: "10.06.2024-16:06:26" → "10.06.2024"
-                dateStr = dateStr.replacingOccurrences(
-                    of: #"-\d{2}:\d{2}:\d{2}"#,
-                    with: "",
-                    options: .regularExpression
-                )
-                dateStr = dateStr.replacingOccurrences(
-                    of: #"\s\d{2}:\d{2}:\d{2}"#,
-                    with: "",
-                    options: .regularExpression
-                )
-                
-                // V5.2 FIX: Karakter normalizasyonu
-                dateStr = dateStr.replacingOccurrences(of: "/", with: ".")
-                dateStr = dateStr.replacingOccurrences(of: "-", with: ".")
-                
-                let formatter = DateFormatter()
-                formatter.dateFormat = "dd.MM.yyyy"
-                date = formatter.date(from: dateStr)
+                let dateStr = String(line[Range(match.range, in: line)!])
+                date = parseDate(dateStr)
             }
         }
         
         return (invoiceNo, date)
+    }
+    
+    /// V5.4: Tarih string'ini Date nesnesine çevirir
+    /// Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+    private func parseDate(_ rawDateStr: String) -> Date? {
+        var dateStr = rawDateStr
+        
+        // Boşlukları temizle ("20- 08- 2024" → "20-08-2024")
+        dateStr = dateStr.replacingOccurrences(of: " ", with: "")
+        
+        // Saat bilgisini temizle ("10.06.2024-16:06:26" → "10.06.2024")
+        dateStr = dateStr.replacingOccurrences(
+            of: #"-\d{2}:\d{2}:\d{2}"#,
+            with: "",
+            options: .regularExpression
+        )
+        dateStr = dateStr.replacingOccurrences(
+            of: #"\s\d{2}:\d{2}:\d{2}"#,
+            with: "",
+            options: .regularExpression
+        )
+        
+        // Karakter normalizasyonu
+        dateStr = dateStr.replacingOccurrences(of: "/", with: ".")
+        dateStr = dateStr.replacingOccurrences(of: "-", with: ".")
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM.yyyy"
+        return formatter.date(from: dateStr)
     }
     
     /// V5.2-5.3 FIX: Telefon/TCKN/Tepe bölgesi numarası mı kontrol et
@@ -586,6 +671,50 @@ struct SpatialParser {
         }
         
         return false
+    }
+    
+    /// V5.3: Fatura numarası geçerlilik kontrolü
+    /// Tepe bölgesi sayıları, telefon numaraları ve geçersiz formatları filtreler
+    /// - Parameters:
+    ///   - candidate: Potansiyel fatura numarası
+    ///   - contextY: Bloğun Y koordinatı (0.0 = tepe, 1.0 = alt)
+    /// - Returns: Geçerli fatura numarası mı?
+    private func isValidInvoiceNumber(_ candidate: String, contextY: CGFloat? = nil) -> Bool {
+        // 1. Sayfanın en tepesindeki (Y < 0.1) etiketsiz sayılar NO
+        if let y = contextY, y < ExtractionConstants.topMarginNoiseThreshold {
+            // Salt sayı ise tepe bölgesinde geçersiz
+            if candidate.rangeOfCharacter(from: .letters) == nil {
+                return false
+            }
+        }
+        
+        // 2. Telefon numarası formatındaysa NO
+        if candidate.hasPrefix("0") && candidate.filter({ $0.isNumber }).count == 11 {
+            return false
+        }
+        if candidate.hasPrefix("05") && candidate.count >= 10 {
+            return false
+        }
+        
+        // 3. Salt rakam dizisi (9+ hane) fatura no olamaz
+        let digitsOnly = candidate.filter { $0.isNumber }
+        if candidate == digitsOnly && digitsOnly.count >= 9 {
+            return false
+        }
+        
+        // 4. TCKN formatı (10-11 hane salt rakam)
+        if candidate == digitsOnly && (digitsOnly.count == 10 || digitsOnly.count == 11) {
+            return false
+        }
+        
+        // 5. E-Arşiv formatına uyuyorsa EVET (3 harf + yıl + 9 rakam)
+        let eArsivPattern = #"^[A-Z]{3}202[0-9]\d{9}$"#
+        if candidate.range(of: eArsivPattern, options: .regularExpression) != nil {
+            return true
+        }
+        
+        // 6. En az bir harf içermeli (genel kural)
+        return candidate.rangeOfCharacter(from: .letters) != nil
     }
     
     private func extractTotalAmount(from text: String) -> Decimal? {

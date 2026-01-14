@@ -119,8 +119,11 @@ struct PDFInputProvider: InputProviding {
         guard !lines.isEmpty else { return [] }
         
         var blocks: [TextBlock] = []
-        let lineHeight: CGFloat = 0.02  // Her satır ~%2 yükseklik
-        let lineSpacing: CGFloat = 0.01 // Satırlar arası boşluk
+        // V5.10: Satır birleştirme hassasiyeti düşürüldü
+        // 0.012 hala satırları birleştiriyordu, 0.006'ya düşürülerek
+        // birbirine yakın satırların (İsim/Adres) ayrı bloklar olması sağlandı
+        let lineHeight: CGFloat = 0.020
+        let lineSpacing: CGFloat = 0.006  // Düşürüldü (was: 0.012)
         
         // Sağ kolon anahtar kelimeleri
         let rightColumnKeywords = [
