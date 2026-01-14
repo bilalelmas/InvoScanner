@@ -10,9 +10,31 @@ import SwiftData
 
 @main
 struct InvoScannerApp: App {
+    
+    init() {
+        // Neo-Glass UI: TabBar için Cam Efekti
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithTransparentBackground()
+        tabAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        
+        UITabBar.appearance().standardAppearance = tabAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+        
+        // NavigationBar için Şeffaflık (Varsayılan)
+        let navAppearance = UINavigationBarAppearance()
+        navAppearance.configureWithTransparentBackground()
+        navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        
+        UINavigationBar.appearance().standardAppearance = navAppearance
+        UINavigationBar.appearance().compactAppearance = navAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark) // Crystal UI için Dark Mode zorunlu
         }
         // SwiftData: Fatura verilerini kalıcı olarak saklamak için model container
         .modelContainer(for: SavedInvoice.self)
