@@ -11,9 +11,17 @@ import SwiftData
 struct DashboardView: View {
     
     @Environment(\.modelContext) private var modelContext
+    
+    // Veriler
+    @Query(sort: \SavedInvoice.date, order: .reverse) 
+    private var allInvoices: [SavedInvoice]
+    
     @State private var viewModel = DashboardViewModel()
+    
+    // Navigation
     @State private var showScanner = false
     @State private var showGallery = false
+    @State private var selectedInvoice: SavedInvoice?
     
     var body: some View {
         ZStack {
@@ -28,40 +36,71 @@ struct DashboardView: View {
                     
                     if viewModel.isLoading {
                         loadingView
-                    } else if !viewModel.isEmpty {
+                    } else {
                         
                         // Ana Kart (Toplam Harcama)
-                        mainStatsCard
+                        if !allInvoices.isEmpty {
+                            mainStatsCard
+                            statsGrid
+                        } else {
+                            // Boş ise büyük empty state
+                            emptyStateView
+                        }
                         
-                        // İstatistik Izgarası
-                        statsGrid
-                        
-                        // Son İşlemler
-                        recentActivitySection
-                        
-                    } else {
-                        emptyStateView
+                        // Son İşlemler (Doluysa göster)
+                        if !allInvoices.isEmpty {
+                            recentActivitySection
+                        }
                     }
                 }
                 .padding(.top, 20)
                 .padding(.horizontal)
-                .padding(.bottom, 100) // TabBar için boşluk
+                .padding(.bottom, 100)
             }
             .refreshable {
                 await viewModel.loadData(context: modelContext)
             }
+            
+            // 3. Floating Action Button (FAB)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    
+                    Button {
+                        showScanner = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 30, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 72, height: 72)
+                            .background(
+                                Circle()
+                                    .fill(
+                                        LinearGradient(colors: [.cyan, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                                    .shadow(color: .cyan.opacity(0.5), radius: 10, x: 0, y: 5)
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(.white.opacity(0.3), lineWidth: 1)
+                            )
+                    }
+                    .padding(.trailing, 24)
+                    .padding(.bottom, 24)
+                }
+            }
         }
         .task {
-            // Verileri yükle
+            // İstatistikleri hesapla
             await viewModel.loadData(context: modelContext)
         }
-        .sheet(isPresented: $showScanner) {
-            // Scanner View entegrasyonu (Placeholder)
-            ZStack {
-                CrystalBackground()
-                Text("Kamera Modu Aktif")
-                    .foregroundStyle(.white)
-            }
+        .fullScreenCover(isPresented: $showScanner) {
+            ScannerView()
+        }
+        .sheet(item: $selectedInvoice) { invoice in
+            SavedInvoiceDetailView(savedInvoice: invoice)
+                .presentationBackground(.ultraThinMaterial)
         }
     }
     
@@ -162,7 +201,7 @@ struct DashboardView: View {
         HStack(spacing: 16) {
             GlassStatCard(
                 title: "Fatura Adedi",
-                value: "\(viewModel.stats.totalInvoiceCount)",
+                value: "\(allInvoices.count)",
                 icon: "doc.text.fill",
                 color: .indigo
             )
@@ -183,26 +222,16 @@ struct DashboardView: View {
                     .font(.title3.bold())
                     .foregroundStyle(.white)
                 Spacer()
-                Button("Tümü") {
-                    // Navigate to list
-                }
-                .font(.subheadline)
-                .foregroundStyle(.cyan)
             }
             
-            if !viewModel.stats.isEmpty {
-                // Not: DashboardViewModel'de recentInvoices eksik olabilir, 
-                // şimdilik sadece görsel test için dummy loop veya viewModel desteği gerek
-                // V6.0: ViewModel'e recentInvoices eklenmeli veya buradan sorgu yapılmalı
-                // Şimdilik listeye yönlendirme butonu var, burası boş kalmasın diye statik bir mesaj
-                
-                GlassInvoiceRow(
-                    supplierName: "Son eklenen faturalar",
-                    totalAmount: nil,
-                    date: Date(),
-                    isVerified: true
-                )
-                .opacity(0.5)
+            LazyVStack(spacing: 12) {
+                // Son 5 faturayı göster
+                ForEach(allInvoices.prefix(5)) { invoice in
+                    InvoiceItemRow(invoice: invoice)
+                        .onTapGesture {
+                            selectedInvoice = invoice
+                        }
+                }
             }
         }
     }
@@ -218,8 +247,9 @@ struct DashboardView: View {
                 .font(.title2.bold())
                 .foregroundStyle(.white)
             
-            Text("İlk faturanızı eklemek için +'ya basın")
+            Text("Yeni eklemek için sağ alttaki + butonuna basın")
                 .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
             Spacer()
         }
         .frame(height: 300)
@@ -236,9 +266,35 @@ struct DashboardView: View {
     
     // MARK: - Helpers
     
+    // Row Helper (Thumbnail loading)
+    struct InvoiceItemRow: View {
+        let invoice: SavedInvoice
+        @State private var thumbnail: UIImage?
+        
+        var body: some View {
+            GlassInvoiceRow(
+                supplierName: invoice.supplierName ?? "Bilinmiyor",
+                totalAmount: invoice.totalAmount,
+                date: invoice.date,
+                isVerified: invoice.isAutoAccepted,
+                thumbnail: thumbnail
+            )
+            .task {
+                if let fileName = invoice.imageFileName {
+                    let image = await Task.detached(priority: .background) {
+                        ImageStorageService.shared.load(fileName: fileName)
+                    }.value
+                    await MainActor.run { self.thumbnail = image }
+                }
+            }
+        }
+    }
+    
     private func calculateAverage() -> String {
-        guard viewModel.stats.totalInvoiceCount > 0 else { return "₺0" }
-        let avg = NSDecimalNumber(decimal: viewModel.stats.monthlySpend).doubleValue / Double(viewModel.stats.totalInvoiceCount)
+        guard !allInvoices.isEmpty else { return "₺0" }
+        // İstatistikler ViewModel'den veya Query'den gelebilir. Tutarlılık için ViewModel tercih ettim ama basitçe:
+        let total = allInvoices.reduce(0) { $0 + (NSDecimalNumber(decimal: $1.totalAmount ?? 0).doubleValue) }
+        let avg = total / Double(allInvoices.count)
         return String(format: "₺%.0f", avg)
     }
 }

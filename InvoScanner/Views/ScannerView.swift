@@ -2,45 +2,93 @@ import SwiftUI
 import UniformTypeIdentifiers
 import VisionKit
 
+// MARK: - Scanner View (Neo-Glass)
+
 struct ScannerView: View {
     @StateObject private var viewModel = ScannerViewModel()
+    
+    // UI States
     @State private var showDocumentPicker = false
+    @State private var showCamera = false
     @State private var selectedImage: UIImage?
     
+    // Navigation
+    @State private var showDetail = false
+    
     var body: some View {
-        NavigationView {
-            VStack {
-                if let invoice = viewModel.scannedInvoice {
-                    ResultView(invoice: invoice)
-                } else if viewModel.isScanning {
-                    ProgressView("Taranıyor...")
-                } else {
-                    if let image = selectedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 300)
-                            .cornerRadius(12)
-                            .padding()
-                    } else {
-                        ContentUnavailableView("Belge Seçin", systemImage: "doc.viewfinder", description: Text("Analiz etmek için bir fatura fotoğrafı veya PDF'i yükleyin"))
+        NavigationStack {
+            ZStack {
+                // 1. Atmosfer
+                CrystalBackground()
+                
+                // 2. İçerik
+                VStack(spacing: 40) {
+                    
+                    // Başlık
+                    VStack(spacing: 8) {
+                        Text("Belge Tara")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .shadow(color: .cyan.opacity(0.5), radius: 10)
+                        
+                        Text("Yapay zeka ile faturalarınızı dijitalleştirin")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.7))
                     }
-                }
-                
-                Spacer()
-                
-                Button(action: { showDocumentPicker = true }) {
-                    Label("Belge Yükle", systemImage: "arrow.up.doc")
-                        .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                    .padding(.top, 40)
+                    
+                    Spacer()
+                    
+                    // Ana Aksiyonlar
+                    if viewModel.isScanning {
+                        glassLoadingView
+                    } else {
+                        HStack(spacing: 24) {
+                            // Kamera Butonu
+                            actionButton(
+                                icon: "camera.fill",
+                                title: "Kamera",
+                                color: .cyan
+                            ) {
+                                if DocumentCameraView.isSupported {
+                                    showCamera = true
+                                }
+                            }
+                            
+                            // Galeri Butonu
+                            actionButton(
+                                icon: "photo.fill",
+                                title: "Galeri / PDF",
+                                color: .purple
+                            ) {
+                                showDocumentPicker = true
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Alt Bilgi
+                    Text("Desteklenenler: Fiş, Fatura, PDF")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(.bottom, 20)
                 }
                 .padding()
             }
-            .navigationTitle("InvoScanner V0")
+            // Kamera Sheet
+            .fullScreenCover(isPresented: $showCamera) {
+                DocumentCameraView(onScanComplete: { images in
+                    if let first = images.first {
+                        self.selectedImage = first
+                        viewModel.scan(image: first)
+                    }
+                }, onCancel: {
+                    // İptal
+                })
+                .ignoresSafeArea()
+            }
+            // Dosya Seçici Sheet
             .sheet(isPresented: $showDocumentPicker) {
                 DocumentPicker(selectedImage: $selectedImage, onPDFSelected: { url in
                     viewModel.scan(pdfURL: url)
@@ -48,39 +96,74 @@ struct ScannerView: View {
                     viewModel.scan(image: image)
                 })
             }
+            // Sonuç Detay Sheet (Düzenleme ve Kaydetme)
+            .sheet(isPresented: $showDetail, onDismiss: {
+                // Kapatılınca resetle?
+                // viewModel.scannedInvoice = nil // İsteğe bağlı, kaydedildiyse resetlenmeli
+            }) {
+                if let invoice = viewModel.scannedInvoice {
+                    InvoiceDetailView(invoice: invoice, scannedImage: selectedImage)
+                }
+            }
+            // ViewModel Dinleme
+            .onChange(of: viewModel.scannedInvoice) { oldValue, newValue in
+                if newValue != nil {
+                    showDetail = true
+                }
+            }
+            .onChange(of: viewModel.errorMessage) { oldValue, newValue in
+                // Hata gösterimi eklenebilir (Alert)
+            }
+        }
+    }
+    
+    // MARK: - Components
+    
+    private var glassLoadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .tint(.white)
+                .scaleEffect(1.5)
+            
+            Text("Analiz Ediliyor...")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .shadow(color: .blue, radius: 10)
+        }
+        .padding(40)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 30))
+        .overlay(
+            RoundedRectangle(cornerRadius: 30)
+                .stroke(LinearGradient(colors: [.cyan, .purple], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+        )
+    }
+    
+    private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 40))
+                    .foregroundStyle(.white)
+                    .shadow(color: color, radius: 10)
+                
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 140, height: 140)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
         }
     }
 }
 
-// Sonuçlar için alt görünüm
-struct ResultView: View {
-    let invoice: Invoice
-    
-    var body: some View {
-        List {
-            Section("Analiz Sonuçları") {
-                LabeledContent("Satıcı", value: invoice.supplierName ?? "Bulunamadı")
-                LabeledContent("Tarih", value: invoice.date?.formatted(date: .numeric, time: .omitted) ?? "Bulunamadı")
-                LabeledContent("Toplam", value: invoice.totalAmount?.formatted(.currency(code: "TRY")) ?? "Bulunamadı")
-                LabeledContent("ETTN", value: invoice.ettn?.uuidString ?? "Bulunamadı")
-                if let invoiceNo = invoice.invoiceNumber {
-                    LabeledContent("Fatura No", value: invoiceNo)
-                }
-            }
-            
-            Section("OCR Kalitesi") {
-                HStack {
-                    Text("Güven Skoru")
-                    Spacer()
-                    Text(String(format: "%.0f%%", invoice.confidenceScore * 100))
-                        .foregroundStyle(invoice.isAutoAccepted ? .green : .orange)
-                    Image(systemName: invoice.isAutoAccepted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(invoice.isAutoAccepted ? .green : .orange)
-                }
-            }
-        }
-    }
-}
+// MARK: - Helpers
 
 // Basit Belge Seçici Sarmalayıcı
 struct DocumentPicker: UIViewControllerRepresentable {
@@ -110,21 +193,14 @@ struct DocumentPicker: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
             
-            // Security-scoped erişimi başlat
-            // NOT: PDF için erişimi InputManager yönetiyor (async işlem nedeniyle)
-            // Image için burada durdurabiliriz çünkü senkron işlem
             let didStartAccessing = url.startAccessingSecurityScopedResource()
             
             if url.pathExtension.lowercased() == "pdf" {
-                // PDF: Erişimi InputManager'a bırak (async işlem)
-                // InputManager.extractBlocks içinde startAccess tekrar çağrılacak
-                // ve işlem bitince stopAccess yapılacak
                 if didStartAccessing {
                     url.stopAccessingSecurityScopedResource()
                 }
                 parent.onPDFSelected(url)
             } else {
-                // Image: Senkron işle ve erişimi kapat
                 defer {
                     if didStartAccessing {
                         url.stopAccessingSecurityScopedResource()
@@ -142,14 +218,9 @@ struct DocumentPicker: UIViewControllerRepresentable {
 
 // MARK: - Document Camera View (VNDocumentCameraViewController Wrapper)
 
-/// VNDocumentCameraViewController için SwiftUI sarmalayıcısı
-/// - Kullanım: Anlık belge tarama için kamera arayüzü sağlar
 struct DocumentCameraView: UIViewControllerRepresentable {
     
-    /// Tarama tamamlandığında çağrılır
     var onScanComplete: ([UIImage]) -> Void
-    
-    /// Tarama iptal edildiğinde veya hata oluştuğunda çağrılır
     var onCancel: () -> Void
     
     func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
@@ -197,8 +268,11 @@ struct DocumentCameraView: UIViewControllerRepresentable {
         }
     }
     
-    /// Cihazda doküman tarama desteği olup olmadığını kontrol eder
     static var isSupported: Bool {
         VNDocumentCameraViewController.isSupported
     }
+}
+
+#Preview {
+    ScannerView()
 }
