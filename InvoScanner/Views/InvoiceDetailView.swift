@@ -343,7 +343,7 @@ struct SavedInvoiceDetailView: View {
         }
         .task {
             if let fileName = savedInvoice.imageFileName {
-                let image = await Task.detached(priority: .background) { ImageStorageService.shared.load(fileName: fileName) }.value
+                let image = await Task.detached(priority: .background) { await ImageStorageService.shared.load(fileName: fileName) }.value
                 await MainActor.run { self.invoiceImage = image; self.isLoadingImage = false }
             } else {
                 await MainActor.run { self.isLoadingImage = false }

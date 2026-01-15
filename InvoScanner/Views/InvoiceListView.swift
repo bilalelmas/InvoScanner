@@ -127,7 +127,7 @@ struct InvoiceListView: View {
         private func loadThumbnail() async {
             guard let fileName = invoice.imageFileName else { return }
             let image = await Task.detached(priority: .background) {
-                ImageStorageService.shared.load(fileName: fileName)
+                await ImageStorageService.shared.load(fileName: fileName)
             }.value
             await MainActor.run { self.thumbnail = image }
         }

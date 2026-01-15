@@ -573,7 +573,7 @@ struct SpatialParser {
             let fullRange = NSRange(text.startIndex..., in: text)
             if let match = regex.firstMatch(in: text, range: fullRange),
                let captureRange = Range(match.range(at: 1), in: text) {
-                var dateStr = String(text[captureRange])
+                let dateStr = String(text[captureRange])
                 date = parseDate(dateStr)
             }
         }

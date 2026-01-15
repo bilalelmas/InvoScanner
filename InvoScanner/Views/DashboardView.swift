@@ -283,7 +283,7 @@ struct DashboardView: View {
             .task {
                 if let fileName = invoice.imageFileName {
                     let image = await Task.detached(priority: .background) {
-                        ImageStorageService.shared.load(fileName: fileName)
+                    await ImageStorageService.shared.load(fileName: fileName)
                     }.value
                     await MainActor.run { self.thumbnail = image }
                 }

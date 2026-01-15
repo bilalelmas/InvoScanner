@@ -118,7 +118,7 @@ final class DashboardViewModel {
             // Aylık Trend (Son 6 ay)
             // Basit implementasyon: Sadece mevcut veriyi göster
             // Gelişmiş versiyonda gruplama yapılabilir
-            var trend: [MonthlyData] = []
+            let trend: [MonthlyData] = []
             // (Mock trend değil gerçek veriden hesaplanmalı, şimdilik boş bırakıyorum karmaşıklığı artırmamak için)
             
             // Kategori dağılımı (Şimdilik satıcı bazlı)
