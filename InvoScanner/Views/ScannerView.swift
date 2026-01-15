@@ -46,53 +46,45 @@ struct ScannerView: View {
                     if viewModel.isScanning {
                         glassLoadingView
                     } else {
-                        VStack(spacing: 20) {
-                            // Üst Sıra: Kamera ve Galeri
-                            HStack(spacing: 20) {
-                                // Kamera Butonu
-                                actionButton(
-                                    icon: "camera.fill",
-                                    title: "Kamera",
-                                    subtitle: "Tara",
-                                    color: .cyan
-                                ) {
-                                    if DocumentCameraView.isSupported {
-                                        showCamera = true
-                                    }
-                                }
-                                
-                                // Galeri Butonu (PhotosPicker)
-                                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                    VStack(spacing: 12) {
-                                        Image(systemName: "photo.fill")
-                                            .font(.system(size: 36))
-                                            .foregroundStyle(.white)
-                                            .shadow(color: .purple, radius: 10)
-                                        
-                                        Text("Galeri")
-                                            .font(.headline)
-                                            .foregroundStyle(.white)
-                                        
-                                        Text("Fotoğraf")
-                                            .font(.caption)
-                                            .foregroundStyle(.white.opacity(0.6))
-                                    }
-                                    .frame(width: 130, height: 130)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 24)
-                                            .stroke(.white.opacity(0.2), lineWidth: 1)
-                                    )
-                                    .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
+                        // 3 Buton Tek Satır
+                        HStack(spacing: 16) {
+                            // Kamera Butonu
+                            actionButton(
+                                icon: "camera.fill",
+                                title: "Kamera",
+                                color: .cyan
+                            ) {
+                                if DocumentCameraView.isSupported {
+                                    showCamera = true
                                 }
                             }
                             
-                            // Alt Sıra: Dosya / PDF
+                            // Galeri Butonu (PhotosPicker)
+                            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "photo.fill")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.white)
+                                        .shadow(color: .purple, radius: 8)
+                                    
+                                    Text("Galeri")
+                                        .font(.subheadline.bold())
+                                        .foregroundStyle(.white)
+                                }
+                                .frame(width: 100, height: 100)
+                                .background(.ultraThinMaterial)
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                                )
+                                .shadow(color: .purple.opacity(0.3), radius: 8, x: 0, y: 4)
+                            }
+                            
+                            // Dosya / PDF Butonu
                             actionButton(
                                 icon: "doc.fill",
                                 title: "Dosya",
-                                subtitle: "PDF / Görsel",
                                 color: .orange
                             ) {
                                 showDocumentPicker = true
@@ -192,30 +184,24 @@ struct ScannerView: View {
     
     private func actionButton(icon: String, title: String, subtitle: String? = nil, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 36))
+                    .font(.system(size: 28))
                     .foregroundStyle(.white)
-                    .shadow(color: color, radius: 10)
+                    .shadow(color: color, radius: 8)
                 
                 Text(title)
-                    .font(.headline)
+                    .font(.subheadline.bold())
                     .foregroundStyle(.white)
-                
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                }
             }
-            .frame(width: 130, height: 130)
+            .frame(width: 100, height: 100)
             .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 20)
                     .stroke(.white.opacity(0.2), lineWidth: 1)
             )
-            .shadow(color: color.opacity(0.3), radius: 10, x: 0, y: 5)
+            .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 4)
         }
     }
 }
