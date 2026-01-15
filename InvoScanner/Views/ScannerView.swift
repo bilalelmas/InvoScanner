@@ -1,8 +1,9 @@
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 import VisionKit
 
-// MARK: - Scanner View (Neo-Glass)
+// MARK: - Scanner View (iOS 26 Liquid Glass)
 
 struct ScannerView: View {
     @StateObject private var viewModel = ScannerViewModel()
@@ -11,6 +12,7 @@ struct ScannerView: View {
     @State private var showDocumentPicker = false
     @State private var showCamera = false
     @State private var selectedImage: UIImage?
+    @State private var selectedPhotoItem: PhotosPickerItem?
     
     // Navigation
     @State private var showDetail = false
@@ -44,23 +46,54 @@ struct ScannerView: View {
                     if viewModel.isScanning {
                         glassLoadingView
                     } else {
-                        HStack(spacing: 24) {
-                            // Kamera Butonu
-                            actionButton(
-                                icon: "camera.fill",
-                                title: "Kamera",
-                                color: .cyan
-                            ) {
-                                if DocumentCameraView.isSupported {
-                                    showCamera = true
+                        VStack(spacing: 20) {
+                            // Üst Sıra: Kamera ve Galeri
+                            HStack(spacing: 20) {
+                                // Kamera Butonu
+                                actionButton(
+                                    icon: "camera.fill",
+                                    title: "Kamera",
+                                    subtitle: "Tara",
+                                    color: .cyan
+                                ) {
+                                    if DocumentCameraView.isSupported {
+                                        showCamera = true
+                                    }
+                                }
+                                
+                                // Galeri Butonu (PhotosPicker)
+                                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "photo.fill")
+                                            .font(.system(size: 36))
+                                            .foregroundStyle(.white)
+                                            .shadow(color: .purple, radius: 10)
+                                        
+                                        Text("Galeri")
+                                            .font(.headline)
+                                            .foregroundStyle(.white)
+                                        
+                                        Text("Fotoğraf")
+                                            .font(.caption)
+                                            .foregroundStyle(.white.opacity(0.6))
+                                    }
+                                    .frame(width: 130, height: 130)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 24)
+                                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                                    )
+                                    .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
                                 }
                             }
                             
-                            // Galeri Butonu
+                            // Alt Sıra: Dosya / PDF
                             actionButton(
-                                icon: "photo.fill",
-                                title: "Galeri / PDF",
-                                color: .purple
+                                icon: "doc.fill",
+                                title: "Dosya",
+                                subtitle: "PDF / Görsel",
+                                color: .orange
                             ) {
                                 showDocumentPicker = true
                             }
@@ -119,6 +152,19 @@ struct ScannerView: View {
             .onChange(of: viewModel.errorMessage) { oldValue, newValue in
                 // Hata gösterimi eklenebilir (Alert)
             }
+            // PhotosPicker değişikliği
+            .onChange(of: selectedPhotoItem) { oldValue, newValue in
+                Task {
+                    if let item = newValue,
+                       let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run {
+                            self.selectedImage = image
+                            viewModel.scan(image: image)
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -144,26 +190,32 @@ struct ScannerView: View {
         )
     }
     
-    private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func actionButton(icon: String, title: String, subtitle: String? = nil, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 40))
+                    .font(.system(size: 36))
                     .foregroundStyle(.white)
                     .shadow(color: color, radius: 10)
                 
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(.white)
+                
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             }
-            .frame(width: 140, height: 140)
+            .frame(width: 130, height: 130)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .overlay(
                 RoundedRectangle(cornerRadius: 24)
-                    .stroke(.white.opacity(0.15), lineWidth: 1)
+                    .stroke(.white.opacity(0.2), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            .shadow(color: color.opacity(0.3), radius: 10, x: 0, y: 5)
         }
     }
 }

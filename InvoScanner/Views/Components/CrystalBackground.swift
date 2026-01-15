@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// .0 Crystal UI: Dinamik Aurora Arka Plan
-/// - iOS 18 MeshGradient stilini simüle eder
-/// - Mor ve Gece Mavisi tonlarında hareketli aura
+// MARK: - Crystal Background (iOS 26 Liquid Glass)
+
+/// iOS 26 tarzı dinamik arka plan
+/// Liquid Glass efekti için yumuşak renk geçişleri
 struct CrystalBackground: View {
     @State private var animate = false
     
@@ -12,34 +13,55 @@ struct CrystalBackground: View {
             Color(.black)
                 .ignoresSafeArea()
             
-            // Hareketli Aurora Katmanları
+            // iOS 26 Liquid Glass Katmanları
             ZStack {
                 // Sol Üst - Mor/Mavi
                 Circle()
-                    .fill(Color.indigo.opacity(0.4))
-                    .frame(width: 400, height: 400)
-                    .blur(radius: 100)
-                    .offset(x: animate ? -100 : 100, y: animate ? -100 : 50)
+                    .fill(
+                        RadialGradient(
+                            colors: [.indigo.opacity(0.5), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 200
+                        )
+                    )
+                    .frame(width: 450, height: 450)
+                    .blur(radius: 80)
+                    .offset(x: animate ? -80 : 80, y: animate ? -80 : 40)
                 
                 // Sağ Alt - Turkuaz/Mavi
                 Circle()
-                    .fill(Color.blue.opacity(0.4))
+                    .fill(
+                        RadialGradient(
+                            colors: [.cyan.opacity(0.4), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 200
+                        )
+                    )
                     .frame(width: 400, height: 400)
-                    .blur(radius: 100)
-                    .offset(x: animate ? 100 : -50, y: animate ? 200 : 0)
+                    .blur(radius: 90)
+                    .offset(x: animate ? 120 : -40, y: animate ? 180 : 20)
                 
                 // Orta - Parlak Macenta
                 Circle()
-                    .fill(Color.purple.opacity(0.3))
-                    .frame(width: 300, height: 300)
-                    .blur(radius: 120)
-                    .offset(x: animate ? -50 : 150, y: animate ? 50 : -50)
+                    .fill(
+                        RadialGradient(
+                            colors: [.purple.opacity(0.35), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 150
+                        )
+                    )
+                    .frame(width: 350, height: 350)
+                    .blur(radius: 100)
+                    .offset(x: animate ? -40 : 120, y: animate ? 60 : -40)
             }
-            .animation(.easeInOut(duration: 7).repeatForever(autoreverses: true), value: animate)
+            .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: animate)
             
-            // Grain (Kumlanma) Efekti - Opsiyonel doku
+            // Subtle Grain Overlay
             Rectangle()
-                .fill(.white.opacity(0.02))
+                .fill(.white.opacity(0.015))
                 .ignoresSafeArea()
         }
         .onAppear {
@@ -51,3 +73,4 @@ struct CrystalBackground: View {
 #Preview {
     CrystalBackground()
 }
+
