@@ -4,28 +4,55 @@
 
 [![Swift](https://img.shields.io/badge/Swift-5.10-orange.svg)](https://swift.org)
 [![iOS](https://img.shields.io/badge/iOS-17.0%2B-blue.svg)](https://www.apple.com/ios/)
-[![SwiftData](https://img.shields.io/badge/Data-SwiftData-blueviolet.svg)](https://developer.apple.com/xcode/swiftdata/)
+[![Vision](https://img.shields.io/badge/OCR-Vision%20Framework-green.svg)](https://developer.apple.com/documentation/vision)
+
+---
 
 ## ✨ Öne Çıkan Özellikler
 
-- 🧠 **Hibrit Motor (V3):** Dijital PDF'ler için yerel metin okuma, taranmış belgeler için Vision OCR.
-- 🛡️ **Privacy-First:** Tüm işlemler cihaz üzerinde yapılır; verileriniz hiçbir sunucuya gönderilmez.
-- 📐 **Zone-Aware Parsing:** Belgedeki verileri koordinat bazlı mantıksal bölgelere ayırarak yüksek doğruluk sağlar.
-- 🧪 **Matematiksel Doğrulama:** `Matrah + KDV = Toplam` kontrolü ile hatalı tutar ayıklamayı engeller.
-- 📊 **Modern Dashboard:** SwiftCharts ile harcama analizi ve kategori bazlı görselleştirme.
+- 🧠 **Spatial Pipeline:** Koordinat-farkında metin analizi ile yüksek doğruluk
+- 🛡️ **Privacy-First:** Tüm işlemler cihaz üzerinde; veriler sunucuya gönderilmez
+- 📐 **Zone-Aware Parsing:** Belgeyi semantik bölgelere ayırarak akıllı çıkarım
+- 🧪 **Matematiksel Doğrulama:** "Yalnız..." satırı ile tutar karşılaştırması
+- 📊 **Modern Dashboard:** SwiftCharts ile harcama analizi
+
+---
 
 ## 🏗️ Teknoloji Yığını
 
-- **Dil:** Swift (SwiftUI)
-- **Mimari:** MVVM-R (Repository) + Strategy Pattern
-- **Veri Saklama:** SwiftData
-- **Frameworkler:** Vision, PDFKit, SwiftCharts
+| Kategori | Teknoloji |
+|----------|-----------|
+| **Dil** | Swift 5.10 (SwiftUI) |
+| **Mimari** | MVVM-R + Spatial Pipeline |
+| **OCR** | Vision Framework |
+| **PDF İşleme** | PDFKit |
+| **Görselleştirme** | SwiftCharts |
+
+---
+
+## 🔬 Spatial Pipeline
+
+InvoScanner'ın kalbi olan Spatial Pipeline, metin bloklarını koordinat bazlı analiz ederek daha doğru çıkarım yapar:
+
+```
+TextBlock → BlockClusterer → SemanticBlock → BlockLabeler → LayoutMap → SpatialParser → Invoice
+```
+
+| Bileşen | Görev |
+|---------|-------|
+| `BlockClusterer` | Metin bloklarını paragraflara kümeler |
+| `BlockLabeler` | Bloklara semantik etiket atar (Seller, Buyer, Totals) |
+| `LayoutMap` | 2D belge haritası oluşturur |
+| `SpatialParser` | Orkestratör, veri çıkarımını koordine eder |
+| `AmountToTextVerifier` | Tutarı "Yalnız..." satırıyla doğrular |
+
+---
 
 ## 📁 Hızlı Başlangıç
 
 ### Gereksinimler
 - Xcode 15.0+
-- iOS 17.0+ (SwiftData desteği nedeniyle)
+- iOS 17.0+
 
 ### Kurulum
 1. Projeyi klonlayın:
@@ -35,17 +62,72 @@
 2. `InvoScanner.xcodeproj` dosyasını Xcode ile açın.
 3. Simülatör veya iPhone cihazınızda `Run` (Cmd+R) komutunu çalıştırın.
 
+---
+
 ## 📖 Teknik Dokümantasyon
 
-Projenin derinlemesine mimarisi, servis yapısı ve algoritma detayları için [📄 PROJE_RAPORU_V2.md](file:///Users/bilalelmas/GitHub/InvoScanner/PROJE_RAPORU_V2.md) dosyasını inceleyebilirsiniz.
+Projenin derinlemesine mimarisi ve algoritma açıklamaları için:
 
-## 🗺️ Klasör Yapısı (Özet)
-
-- `Models/`: SwiftData veri modelleri.
-- `Services/`: OCR, Input ve İşleme servisleri.
-- `Strategies/`: Veri ayıklama algoritmaları (ETTN, Tarih, Tutar vb.).
-- `ViewModels/`: UI state yönetimi.
-- `Views/`: SwiftUI arayüz bileşenleri.
+📄 **[PROJE_RAPORU.md](./PROJE_RAPORU.md)**
 
 ---
+
+## 🗺️ Klasör Yapısı
+
+```
+InvoScanner/
+├── Core/           # InputManager, ExtractionConstants
+├── Spatial/        # V5 Pipeline (Clusterer, Labeler, Parser)
+├── Models/         # Invoice veri modeli
+├── ViewModels/     # Dashboard ve Scanner state yönetimi
+├── Views/          # SwiftUI arayüz bileşenleri
+└── Assets/         # Görsel varlıklar
+```
+
+| Klasör | Açıklama |
+|--------|----------|
+| `Core/` | Girdi yönetimi ve merkezi sabitler |
+| `Spatial/` | Spatial Pipeline bileşenleri |
+| `Models/` | Fatura veri modeli ve güven skoru |
+| `ViewModels/` | UI state yönetimi |
+| `Views/` | Dashboard, Scanner, Liste ve Detay ekranları |
+
+---
+
+## 🧪 Testler
+
+```bash
+# Unit ve Golden testlerini çalıştır
+xcodebuild test -scheme InvoScanner -destination 'platform=iOS Simulator,name=iPhone 15'
+```
+
+| Test Tipi | Dosya |
+|-----------|-------|
+| Data-Driven | `DataDrivenTests.swift` |
+| Golden | `GoldenTests.swift` |
+| InputManager | `InputManagerTests.swift` |
+
+---
+
+## 📈 Proje Metrikleri
+
+| Metrik | Değer |
+|--------|-------|
+| Build Status | ✅ Passing |
+| Test Coverage | %85+ (Core Logic) |
+| Privacy | 100% On-Device |
+| Min iOS | 17.0 |
+
+---
+
+## 🗓️ Roadmap
+
+- [x] Spatial Pipeline Mimarisi
+- [x] AmountToTextVerifier (Tutar Doğrulama)
+- [x] SwiftData Persistence
+- [ ] Payload (Ürün Tablosu) Çıkarımı
+- [ ] Cloud Backup
+
+---
+
 *Geliştirici: [Bilal Elmas](https://github.com/bilalelmas)*

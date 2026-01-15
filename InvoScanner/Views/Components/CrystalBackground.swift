@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// V6.0 Crystal UI: Dinamik Aurora Arka Plan
+/// .0 Crystal UI: Dinamik Aurora Arka Plan
 /// - iOS 18 MeshGradient stilini simüle eder
 /// - Mor ve Gece Mavisi tonlarında hareketli aura
 struct CrystalBackground: View {

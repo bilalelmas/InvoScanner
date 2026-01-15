@@ -1,20 +1,19 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - ═══════════════════════════════════════════════════════════════════
-// MARK:   V5 Spatial Models - Production Grade
-// MARK:   Core data structures for 2D Block-Based Document Analysis
-// MARK: ═══════════════════════════════════════════════════════════════════
+// MARK: - Spatial Models
+
+/// 2D blok bazlı belge analizi için temel veri yapıları
 
 // MARK: - TextBlock
 
-/// Raw OCR output representation.
-/// Contains text content and normalized bounding box (0..1 coordinate space).
+/// Ham OCR çıktısı temsili.
+/// Metin içeriği ve normalize edilmiş sınırlayıcı kutu (0..1 koordinat uzayı).
 ///
-/// - Note: The coordinate system assumes:
-///   - Origin (0,0) at TOP-LEFT
-///   - Y increases downward (0 = top, 1 = bottom)
-///   - X increases rightward (0 = left, 1 = right)
+/// - Not: Koordinat sistemi:
+///   - Orijin (0,0) SOL-ÜST köşede
+///   - Y aşağı doğru artar (0 = üst, 1 = alt)
+///   - X sağa doğru artar (0 = sol, 1 = sağ)
 public struct TextBlock: Identifiable, Equatable, Hashable {
     public let id: UUID
     public let text: String
@@ -129,7 +128,7 @@ public struct SemanticBlock: Identifiable, Equatable {
         var currentLine: [TextBlock] = []
         
         // Magic Number: 1% of page height for precise line separation
-        // V5.1 FIX: 0.02 was causing line mixing, 0.01 provides sharper separation
+        // 0.02 was causing line mixing, 0.01 provides sharper separation
         let lineThreshold: CGFloat = 0.01
         
         for block in sortedByY {

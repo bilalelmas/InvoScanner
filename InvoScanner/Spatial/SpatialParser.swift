@@ -3,8 +3,8 @@ import CoreGraphics
 
 // MARK: - Spatial Parser
 
-/// V5 Pipeline Orkestratörü
-/// TextBlock → BlockClusterer → LayoutMap → BlockLabeler → Extraction
+/// Fatura ayrıştırma pipeline'ı
+/// TextBlock → Kümeleme → Etiketleme → Veri Çıkarımı
 struct SpatialParser {
     
     // MARK: - Dependencies
@@ -30,11 +30,9 @@ struct SpatialParser {
         var layoutMap: LayoutMap?
     }
     
-    // MARK: - Main Parsing
+    // MARK: - Ana Ayrıştırma
     
-    /// V5 Pipeline: Blokları kümeler, etiketler ve veri çıkarır
-    /// - Parameter blocks: Ham TextBlock listesi (OCR veya PDF'den)
-    /// - Returns: Ayrıştırılmış fatura verileri
+    /// Blokları kümeler, etiketler ve veri çıkarır
     func parse(_ blocks: [TextBlock]) -> ParsedInvoice {
         // Adım 1: Spatial Kümeleme
         let semanticBlocks = clusterer.performClustering(blocks)
@@ -57,8 +55,7 @@ struct SpatialParser {
         // Tüm metin (fallback için)
         let fullText = blocks.map { $0.text }.joined(separator: "\n")
         
-        // V5.5: ETTN Küresel Arama (DSM Fix)
-        // ETTN her yerde olabilir - önce tüm metinde ara (en güvenilir yöntem)
+        // ETTN Küresel Arama (Tüm metinde ara)
         result.ettn = extractETTN(from: fullText)
         
         // Fallback 1: Eğer tüm metinde bulunamadıysa, etiketli bloklarda ara
@@ -79,7 +76,6 @@ struct SpatialParser {
         // Satıcı
         if let sellerBlock = layoutMap.leftBlock(withLabel: .seller) {
             let extracted = extractSupplierName(from: sellerBlock.text)
-            // V6: Geçerlilik kontrolü - geçersizse fallback'e git
             if let name = extracted, isValidSupplierName(name) {
                 result.supplier = name
             }
@@ -139,8 +135,7 @@ struct SpatialParser {
     // MARK: - Extraction Helpers
     
     private func extractETTN(from text: String) -> String? {
-        // V5.6 FIX: PDF Ligature Temizliği (Kritik: 'ﬀ' -> 'ff')
-        // PDF'lerden gelen tipografik birleşmeler UUID regex'i bozar
+        // PDF Ligature Temizliği ('ff' -> 'ff')
         let cleanText = text
             .replacingOccurrences(of: "ﬀ", with: "ff")  // Ligature: ff
             .replacingOccurrences(of: "ﬁ", with: "fi")  // Ligature: fi
@@ -152,7 +147,7 @@ struct SpatialParser {
             .replacingOccurrences(of: " ", with: "")
             .uppercased() // Regex için hepsini büyük harf yap
         
-        // V5.4: Önce ETTN etiketli pattern'i dene (daha güvenilir)
+        // Önce ETTN etiketli pattern'i dene
         let labeledPattern = "(?:ETTN|ETTV)[:]?([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})"
         if let regex = try? NSRegularExpression(pattern: labeledPattern, options: .caseInsensitive),
            let match = regex.firstMatch(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText)),
@@ -171,7 +166,7 @@ struct SpatialParser {
         return nil
     }
     
-    /// V5.12 GENEL ÇÖZÜM: Satıcı ismini ayıklar ve temizler (Akıllı Makas Mimarisi)
+    /// Satıcı ismini ayıklar ve temizler
     private func extractSupplierName(from text: String) -> String? {
         // 1. Satır Satır Analiz (Line-by-Line Analysis)
         let lines = text.components(separatedBy: .newlines)
@@ -179,7 +174,7 @@ struct SpatialParser {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !isLabelOnlyLine($0) }
         
-        // V5.12: İsmi bitiren "Terminatör" kelimeler
+        // İsmi bitiren "Terminatör" kelimeler
         let terminators = [
             // Adres etiketleri
             "ADRES", "ADRES:",
@@ -221,7 +216,7 @@ struct SpatialParser {
             // Satır tamamen gürültü mü?
             if isNoiseLine(upperLine, prefixes: noiseWords) { continue }
             
-            // V5.12: Satır İÇİNDE terminatör var mı?
+            // Satır İÇİNDE terminatör var mı?
             var cleanLine = line
             var foundTerminator = false
             
@@ -280,7 +275,7 @@ struct SpatialParser {
         return nil
     }
     
-    /// V5.12: Sonek sonrası kesin kesim (Hard Cut)
+    /// Sonek sonrası kesin kesim (Hard Cut)
     private func applyHardSuffixCut(_ text: String) -> String {
         let upperText = text.uppercased(with: Locale(identifier: "tr_TR"))
         
@@ -297,7 +292,7 @@ struct SpatialParser {
         return text
     }
     
-    /// V5.3++ FIX: Satıcı etiketi öneklerini temizler
+    /// Satıcı etiketi öneklerini temizler
     /// Örn: "Satıcı (Merkez): Moonlıfe Mobilya..." → "Moonlıfe Mobilya..."
     private func cleanSellerLabel(_ text: String) -> String {
         var cleaned = text
@@ -354,7 +349,7 @@ struct SpatialParser {
         return cleaned.trimmingCharacters(in: .whitespaces)
     }
     
-    /// V5.4 FIX: Bloktan ilk anlamlı satırı al (şahıs faturaları için)
+    /// Bloktan ilk anlamlı satırı al (şahıs faturaları için)
     /// Etiket satırlarını (XXX:) atlar, ilk gerçek ismi alır
     private func extractFirstMeaningfulLine(from text: String) -> String? {
         let lines = text.components(separatedBy: .newlines)
@@ -391,7 +386,7 @@ struct SpatialParser {
         return nil
     }
     
-    /// V5.3+ FIX: Satıcı adı başındaki VKN/telefon numarasını temizler
+    /// Satıcı adı başındaki VKN/telefon numarasını temizler
     /// Örn: "9795582114 DSM Grup Danışmanlık..." → "DSM Grup Danışmanlık..."
     private func cleanLeadingNumbers(_ text: String) -> String {
         // 9-11 haneli sayı + boşluk ile başlıyorsa temizle
@@ -403,7 +398,7 @@ struct SpatialParser {
         return cleaned.trimmingCharacters(in: .whitespaces)
     }
     
-    /// V6: Satıcı adı geçerliliğini kontrol eder
+    /// : Satıcı adı geçerliliğini kontrol eder
     /// Geçersiz sonuçlar fallback'i tetikler
     private func isValidSupplierName(_ name: String) -> Bool {
         // Minimum uzunluk
@@ -429,7 +424,7 @@ struct SpatialParser {
         return true
     }
     
-    /// V6: Sadece etiket içeren satırları tespit eder (filtrele)
+    /// : Sadece etiket içeren satırları tespit eder (filtrele)
     private func isLabelOnlyLine(_ line: String) -> Bool {
         let labelPatterns = [
             #"^Vergi\s*Dairesi\s*:"#,
@@ -451,11 +446,11 @@ struct SpatialParser {
         }
     }
     
-    /// V5.7 FIX: Legal suffix sonrasındaki her şeyi (adres başlangıcı dahil) kesin olarak temizler
+    /// Legal suffix sonrasındaki her şeyi (adres başlangıcı dahil) kesin olarak temizler
     /// Örn: "AS KARAKIZ... LİMİTED ŞİRKETİ YÜRÜKSELİM" -> "AS KARAKIZ... LİMİTED ŞİRKETİ"
     /// Örn: "SALVANINI... LİMİTED ŞİRKETİ ÖMERLİ" -> "SALVANINI... LİMİTED ŞİRKETİ"
     private func truncateAfterLegalSuffix(_ text: String) -> String {
-        // V5.7: Türkçe locale ile büyük harf dönüşümü (ı→I, i→İ)
+        // Türkçe locale ile büyük harf dönüşümü (ı→I, i→İ)
         let upperText = text.uppercased(with: Locale(identifier: "tr_TR"))
         
         // En uzun eşleşmeyi bulmak için sıralı liste
@@ -467,7 +462,7 @@ struct SpatialParser {
                 // Orijinal metinde bu indexe karşılık gelen yer
                 let originalEndIndex = text.index(text.startIndex, offsetBy: upperText.distance(from: upperText.startIndex, to: endIndex))
                 
-                // V5.7: Kesin kesim - sadece soneke kadar olan kısmı al
+                // Kesin kesim - sadece soneke kadar olan kısmı al
                 return String(text[..<originalEndIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
@@ -562,16 +557,16 @@ struct SpatialParser {
         var invoiceNo: String?
         var date: Date?
         
-        // V5.2 FIX: E-Arşiv öncelikli fatura no arama
+        // E-Arşiv öncelikli fatura no arama
         // Öncelik 1: E-Arşiv standardı [A-Z]{3}202[0-5]\d{9}
         let eArsivPattern = try? NSRegularExpression(pattern: "[A-Z]{3}202[0-5]\\d{9}", options: [])
         // Öncelik 2: Genel format [A-Z0-9]{2,3}\d{7,13}
         let generalPattern = try? NSRegularExpression(pattern: "[A-Z0-9]{2,3}\\d{7,13}", options: [])
         
-        // V5.4: Tarih pattern - DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY formatları
+        // Tarih pattern - DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY formatları
         let datePattern = try? NSRegularExpression(pattern: #"\d{2}\s*[-./]\s*\d{2}\s*[-./]\s*\d{4}"#, options: [])
         
-        // V5.4: Önce etiketli tarih ara (daha güvenilir)
+        // Önce etiketli tarih ara (daha güvenilir)
         // (?:Fatura|Düzenlenme)\s*Tarihi\s*[:]?\s*(\d{2}[./-]\d{2}[./-]\d{4})
         let labeledDatePattern = #"(?:Fatura|Düzenlenme|FATURA|DÜZENLENME)\s*(?:Tarihi|TARİHİ|TARIHI)\s*[:]?\s*(\d{2}\s*[-./]\s*\d{2}\s*[-./]\s*\d{4})"#
         if let regex = try? NSRegularExpression(pattern: labeledDatePattern, options: .caseInsensitive) {
@@ -590,7 +585,7 @@ struct SpatialParser {
             if invoiceNo == nil {
                 if let match = eArsivPattern?.firstMatch(in: line, range: range) {
                     let candidate = String(line[Range(match.range, in: line)!])
-                    // V5.3: Gelişmiş validasyon
+                    // Gelişmiş validasyon
                     if isValidInvoiceNumber(candidate) {
                         invoiceNo = candidate
                     }
@@ -601,14 +596,14 @@ struct SpatialParser {
             if invoiceNo == nil {
                 if let match = generalPattern?.firstMatch(in: line, range: range) {
                     let candidate = String(line[Range(match.range, in: line)!])
-                    // V5.3: Gelişmiş validasyon
+                    // Gelişmiş validasyon
                     if isValidInvoiceNumber(candidate) {
                         invoiceNo = candidate
                     }
                 }
             }
             
-            // V5.4: Fallback tarih - etiket bulunamadıysa herhangi bir tarih pattern'i
+            // Fallback tarih - etiket bulunamadıysa herhangi bir tarih pattern'i
             if date == nil, let match = datePattern?.firstMatch(in: line, range: range) {
                 let dateStr = String(line[Range(match.range, in: line)!])
                 date = parseDate(dateStr)
@@ -618,7 +613,7 @@ struct SpatialParser {
         return (invoiceNo, date)
     }
     
-    /// V5.4: Tarih string'ini Date nesnesine çevirir
+    /// Tarih string'ini Date nesnesine çevirir
     /// Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
     private func parseDate(_ rawDateStr: String) -> Date? {
         var dateStr = rawDateStr
@@ -647,14 +642,14 @@ struct SpatialParser {
         return formatter.date(from: dateStr)
     }
     
-    /// V5.2-5.3 FIX: Telefon/TCKN/Tepe bölgesi numarası mı kontrol et
+    /// -5.3 FIX: Telefon/TCKN/Tepe bölgesi numarası mı kontrol et
     /// - 10-11 haneli salt rakam = muhtemelen telefon veya TCKN
-    /// - V5.3: Salt rakam dizileri (barcode, tracking) fatura no olamaz
+    /// - Salt rakam dizileri (barcode, tracking) fatura no olamaz
     private func isPhoneOrTCKN(_ value: String) -> Bool {
         // Sadece rakamlardan oluşuyor mu?
         let digitsOnly = value.filter { $0.isNumber }
         
-        // V5.3: Salt rakam ise fatura no olamaz (örn: 9806598920 tepe bölgesi sayısı)
+        // Salt rakam ise fatura no olamaz (örn: 9806598920 tepe bölgesi sayısı)
         // E-Arşiv formatı en az 3 harf içermeli
         if value == digitsOnly && digitsOnly.count >= 9 {
             return true
@@ -673,7 +668,7 @@ struct SpatialParser {
         return false
     }
     
-    /// V5.3: Fatura numarası geçerlilik kontrolü
+    /// Fatura numarası geçerlilik kontrolü
     /// Tepe bölgesi sayıları, telefon numaraları ve geçersiz formatları filtreler
     /// - Parameters:
     ///   - candidate: Potansiyel fatura numarası
@@ -720,10 +715,10 @@ struct SpatialParser {
     private func extractTotalAmount(from text: String) -> Decimal? {
         let lines = text.uppercased().components(separatedBy: .newlines)
         
-        // V5.3: Öncelik bazlı anahtar kelimeler (Ödenecek Tutar mutlak öncelik)
+        // Öncelik bazlı anahtar kelimeler (Ödenecek Tutar mutlak öncelik)
         // Yüksek öncelikli kelimeler düşük öncelikliden daha güvenilir
         let priorityKeywords: [(keyword: String, priority: Int)] = [
-            // V5.3: Mutlak öncelik - Ödenecek Tutar
+            // Mutlak öncelik - Ödenecek Tutar
             ("ÖDENECEK TUTAR", 150),
             ("ODENECEK TUTAR", 150),
             ("ÖDENECEK", 140),
@@ -737,7 +732,7 @@ struct SpatialParser {
             // Orta öncelik
             ("TOPLAM TUTAR", 60),
             ("TOPLAM", 50),
-            // V5.3: Düşük öncelik - Mal Hizmet Toplamı (ara toplam, ÖDENECEK bulunursa yoksayılır)
+            // Düşük öncelik - Mal Hizmet Toplamı (ara toplam, ÖDENECEK bulunursa yoksayılır)
             ("MAL HİZMET TOPLAMI", 30),
             ("MAL HIZMET TOPLAMI", 30)
         ]
@@ -771,7 +766,7 @@ struct SpatialParser {
     }
     
     private func extractAmount(from text: String) -> Decimal? {
-        // V5.2 FIX: Esnek tutar regex - OCR varyasyonlarını kapsar
+        // Esnek tutar regex - OCR varyasyonlarını kapsar
         // Standart TR: 1.234,56
         // OCR hataları: 1 234,56 veya 1.234.56 veya 1234,56
         

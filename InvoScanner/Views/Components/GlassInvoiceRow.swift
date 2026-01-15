@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// V6.0 Crystal UI: Cam Fatura Listesi Satırı
+/// .0 Crystal UI: Cam Fatura Listesi Satırı
 /// - SavedInvoice veya Invoice modelleriyle çalışabilir
 struct GlassInvoiceRow: View {
     // Veri Modeli: SavedInvoice (Persistence) veya Invoice (Transient)

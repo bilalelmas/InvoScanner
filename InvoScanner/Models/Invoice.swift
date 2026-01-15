@@ -9,11 +9,11 @@ struct Invoice: Identifiable, Equatable {
     var totalAmount: Decimal?
     var supplierName: String?
     
-    // V5.1: Tutar Doğrulama ("Yalnız..." kontrolü)
+    // Tutar Doğrulama ("Yalnız..." kontrolü)
     var isAmountVerified: Bool?
     var amountConfidence: Double?
     
-    // V5.1: Gelişmiş Güven Skoru (0.0 - 1.0)
+    // Gelişmiş Güven Skoru (0.0 - 1.0)
     var confidenceScore: Double {
         var score = 0.0
         
@@ -23,7 +23,7 @@ struct Invoice: Identifiable, Equatable {
         if totalAmount != nil { score += 0.25 }
         if supplierName != nil { score += 0.20 }
         
-        // V5.1: Tutar doğrulama bonusu
+        // Tutar doğrulama bonusu
         if isAmountVerified == true {
             score += 0.20
         } else if let confidence = amountConfidence, confidence > 0.5 {
@@ -38,7 +38,7 @@ struct Invoice: Identifiable, Equatable {
         return confidenceScore >= 0.70
     }
     
-    // MARK: - V5 Convenience Initializer
+    // MARK: - Convenience Initializer
     
     /// SpatialParser sonucundan Invoice oluşturur
     init(from result: SpatialParser.ParsedInvoice) {

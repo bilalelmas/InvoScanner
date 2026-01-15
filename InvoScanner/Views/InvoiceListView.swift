@@ -29,47 +29,53 @@ struct InvoiceListView: View {
                 VStack(spacing: 0) {
                     // Custom Search Bar
                     glassSearchBar
-                        .padding()
+                        .padding(.horizontal)
+                        .padding(.top)
                     
-                    // Filtreleme Segmentleri (İsteğe bağlı, şimdilik menüde)
+                    // Filtre Segmentleri
+                    Picker("Filtre", selection: $selectedFilter) {
+                        ForEach(InvoiceFilter.allCases, id: \.self) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding()
                     
                     if filteredInvoices.isEmpty {
                         emptyStateView
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: 16) {
-                                ForEach(filteredInvoices) { invoice in
-                                    InvoiceItemView(invoice: invoice)
-                                        .onTapGesture {
-                                            selectedInvoice = invoice
-                                        }
-                                        .contextMenu {
-                                            Button(role: .destructive) {
-                                                deleteInvoice(invoice)
-                                            } label: {
-                                                Label("Sil", systemImage: "trash")
-                                            }
-                                        }
-                                }
+                        // List yapısı (Swipe-to-delete için)
+                        List {
+                            ForEach(filteredInvoices) { invoice in
+                                InvoiceItemView(invoice: invoice)
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .onTapGesture {
+                                        selectedInvoice = invoice
+                                    }
                             }
-                            .padding()
-                            .padding(.bottom, 80) // TabBar payı
+                            .onDelete(perform: deleteInvoices)
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden) // List arka planını gizle
                     }
                 }
             }
             .navigationTitle("Faturalar")
-            .navigationBarTitleDisplayMode(.large) // Large title şeffaflıkla güzel durur
-            .toolbarBackground(.hidden, for: .navigationBar) // Navigation bar şeffaf
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    filterMenuButton
-                }
-            }
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(item: $selectedInvoice) { invoice in
                 SavedInvoiceDetailView(savedInvoice: invoice)
-                    .presentationBackground(.ultraThinMaterial) // Cam Sheet
+                    .presentationBackground(.ultraThinMaterial)
             }
+        }
+    }
+    
+    // MARK: - Delete Handler
+    private func deleteInvoices(at offsets: IndexSet) {
+        for index in offsets {
+            let invoice = filteredInvoices[index]
+            deleteInvoice(invoice)
         }
     }
     
@@ -124,27 +130,6 @@ struct InvoiceListView: View {
                 ImageStorageService.shared.load(fileName: fileName)
             }.value
             await MainActor.run { self.thumbnail = image }
-        }
-    }
-    
-    private var filterMenuButton: some View {
-        Menu {
-            ForEach(InvoiceFilter.allCases, id: \.self) { filter in
-                Button {
-                    selectedFilter = filter
-                } label: {
-                    if selectedFilter == filter {
-                        Label(filter.title, systemImage: "checkmark")
-                    } else {
-                        Text(filter.title)
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.white)
-                .font(.title2)
         }
     }
     

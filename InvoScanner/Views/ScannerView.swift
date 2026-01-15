@@ -14,6 +14,7 @@ struct ScannerView: View {
     
     // Navigation
     @State private var showDetail = false
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
@@ -98,11 +99,15 @@ struct ScannerView: View {
             }
             // Sonuç Detay Sheet (Düzenleme ve Kaydetme)
             .sheet(isPresented: $showDetail, onDismiss: {
-                // Kapatılınca resetle?
-                // viewModel.scannedInvoice = nil // İsteğe bağlı, kaydedildiyse resetlenmeli
+                // Sheet kapandığında (Kaydet veya İptal sonrası) state'i temizle
+                viewModel.scannedInvoice = nil
             }) {
                 if let invoice = viewModel.scannedInvoice {
-                    InvoiceDetailView(invoice: invoice, scannedImage: selectedImage)
+                    InvoiceDetailView(invoice: invoice, scannedImage: selectedImage, onSave: {
+                        // Kayıt başarılı olduğunda:
+                        // Eğer Dashboard'dan modal olarak açıldıysa bu view'i kapat.
+                        dismiss()
+                    })
                 }
             }
             // ViewModel Dinleme

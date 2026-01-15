@@ -1,136 +1,279 @@
-# 📄 PROJE RAPORU: InvoScanner (V3)
+# 📄 PROJE RAPORU: InvoScanner (V5)
 
-**Son Güncelleme:** 25 Aralık 2024
-**Sürüm:** 3.0.0 (Stable)
+**Son Güncelleme:** 11 Ocak 2026  
+**Sürüm:** 5.0.0 (Spatial Pipeline)
+
+---
 
 ## 1. Proje Tanımı ve Vizyonu
-InvoScanner, e-Arşiv faturalarından kritik bilgileri sıfıra yakın hata payı ile ayıklamak amacıyla geliştirilmiş, **Hibrit Ayrıştırma Motoru (Hybrid Extraction Engine)** kullanan akıllı bir mobil uygulama altyapısıdır. 
+
+InvoScanner, e-Arşiv faturalarından kritik bilgileri sıfıra yakın hata payı ile ayıklamak amacıyla geliştirilmiş, **V5 Spatial Pipeline** mimarisini kullanan akıllı bir mobil uygulama altyapısıdır.
 
 Sistem, verinin kaynağına göre dinamik olarak değişen iki kademeli bir yaklaşım benimser:
-1.  **Yerel PDF Ayrıştırma (Native PDF Pipeline):** Dijital doğma PDF'ler için PDFKit üzerinden metin katmanına doğrudan erişim (%100 doğruluk).
-2.  **Vision OCR Pipeline:** Taranmış belgeler veya fotoğrafı çekilmiş faturalar için gelişmiş Vision Framework entegrasyonu.
+
+1. **Yerel PDF Ayrıştırma (Native PDF Pipeline):** Dijital doğma PDF'ler için PDFKit üzerinden metin katmanına doğrudan erişim (%100 doğruluk).
+2. **Vision OCR Pipeline:** Taranmış belgeler veya fotoğrafı çekilmiş faturalar için gelişmiş Vision Framework entegrasyonu.
 
 Bu hibrit yapı, veri gizliliğini (Privacy-First) sağlamak adına tamamen cihaz üzerinde (on-device) çalışır ve saniyeler içinde sonuç üretir.
 
+---
+
 ## 2. Temel Hedefler (Focus Fields)
-Sistem, "Az ama kusursuz" ilkesiyle şu 4 kritik veri alanına odaklanır:
 
-*   **ETTN (UUID):** Faturanın 36 karakterlik benzersiz yasal kimliği.
-*   **Fatura Toplam Tutarı:** Vergiler dahil, ödenecek nihai tutar (Matematiksel doğrulamalı).
-*   **Fatura Tarihi:** Dokümanın yasal düzenlenme tarihi (Normalize edilmiş).
-*   **Satıcı İsmi (Supplier):** Hizmeti sağlayan kurumun resmi ticari adı (Puanlama tabanlı).
+Sistem, "Az ama kusursuz" ilkesiyle şu **4 kritik veri alanına** odaklanır:
 
-## 3. Teknik Mimari (MVVM-R)
+| Alan | Açıklama | Doğrulama |
+|------|----------|-----------|
+| **ETTN (UUID)** | Faturanın 36 karakterlik benzersiz yasal kimliği | Hex & 36 Karakter Kontrolü |
+| **Fatura Toplam Tutarı** | Vergiler dahil, ödenecek nihai tutar | "Yalnız..." Metinsel Doğrulama |
+| **Fatura Tarihi** | Dokümanın yasal düzenlenme tarihi | Normalize Edilmiş Tarih Validasyonu |
+| **Satıcı İsmi (Supplier)** | Hizmeti sağlayan kurumun resmi ticari adı | Puanlama Tabanlı Scoring |
+
+---
+
+## 3. Teknik Mimari (MVVM-R + Spatial Pipeline)
+
 Proje, Sorumlulukların Ayrılığı (SoC) ve Test Edilebilirlik ilkelerini ön planda tutan **MVVM-R (Model-View-ViewModel-Repository)** mimarisini kullanır.
 
-### Mimari Bileşenler:
-- **Views:** SwiftUI tabanlı modern ve dinamik arayüz (Dashboard, Charts).
-- **ViewModels:** İş mantığını ve state yönetimini (LoadState) sağlar.
-- **Services:** `InputManager`, `OCRService` ve `InvoiceParser` gibi atomik servisler.
-- **Strategies:** Veri ayıklama mantığını kapsülleyen bağımsız strateji sınıfları.
-- **Persistence (SwiftData):** Verilerin yerel olarak güvenli saklanması.
+### 3.1. V5 Spatial Pipeline Akışı
 
-### Veri Akış Diyagramı:
 ```mermaid
 graph TD
-    A[Girdi: PDF/Image] --> B[InputManager Facade]
+    A[📄 Girdi: PDF/Image] --> B[InputManager Facade]
     B --> C{PDF mi?}
     C -- Evet --> D[Native PDF Extractor]
     C -- Hayır --> E[Vision OCR Service]
-    D & E --> F[Text Normalizer]
-    F --> G[Line Injector & Zone Classifier]
-    G --> H[Strategy Resolver]
-    H --> I[Extraction Strategies]
-    I --> J[Math & Context Verification]
-    J --> K[SwiftData Persistence]
-    K --> L[Dashboard UI]
+    D & E --> F[TextBlock Listesi]
+    F --> G[BlockClusterer]
+    G --> H[SemanticBlock Listesi]
+    H --> I[BlockLabeler]
+    I --> J[LabeledBlock Listesi]
+    J --> K[LayoutMap Oluşturma]
+    K --> L[SpatialParser Extraction]
+    L --> M[AmountToTextVerifier]
+    M --> N[Invoice Model]
+    N --> O[Dashboard UI]
 ```
 
-## 4. Gelişmiş Ayrıştırma Motoru (V3)
+### 3.2. Mimari Bileşenler
 
-### 4.1. Strategy Pattern & Resolver
-Sistem, her alan için farklı algoritmalar yürüten bir **Strategy Chain** kullanır. `StrategyResolver`, belgenin tipine (e-Arşiv, Trendyol vb.) göre en uygun strateji setini dinamik olarak seçer.
+| Katman | Sorumluluk |
+|--------|------------|
+| **Views** | SwiftUI tabanlı modern ve dinamik arayüz (Dashboard, Charts) |
+| **ViewModels** | İş mantığını ve state yönetimini (LoadState) sağlar |
+| **Core** | `InputManager`, `ExtractionConstants` gibi merkezi servisler |
+| **Spatial** | V5 Pipeline bileşenleri (Clusterer, Labeler, Parser) |
+| **Models** | `Invoice` veri modeli |
 
-| Alan | Kullanılan Mantık | Güvenlik Bariyeri |
-|------|-------------------|-------------------|
-| **ETTN** | Regex (UUID v4) | 36 Karakter & Hex Kontrolü |
-| **Date** | Multi-Pattern Regex | Tarih Validasyonu (Gelecek tarih reddi) |
-| **Amount** | Footer Priority + Largest Number | Math Check: `| (Matrah + KDV) - Toplam | < 0.05` |
-| **Supplier** | Quality Scoring Model | Legal Suffix (A.Ş, LTD) & Garbage Filter |
+---
 
-### 4.2. Zone-Based Concept
-Belge 4 ana bölgeye ayrılarak işlem önceliği verilir:
-- **Header (%0-20):** ETTN, Fatura No ve Logo tespiti.
-- **Supplier (%20-40):** Satıcı bilgileri ve VKN/TCKN tespiti.
-- **Payload (%40-80):** Mal/Hizmet tablosu (GElecek versiyon hedefi).
-- **Footer (%80-100):** Toplam tutarlar ve alt notlar.
+## 4. V5 Spatial Pipeline Mimarisi
 
-## 5. Kritik Servisler ve Algoritmalar
+### 4.1. Pipeline Bileşenleri
 
-### 5.1. SupplierQualityScorer
-Tedarikçi tespiti için kullanılan ağırlıklı puanlama algoritması:
-- **Legal Suffix (+40p):** A.Ş., LTD. ŞTİ. gibi ifadelerin varlığı.
-- **Position (+30p):** Sayfanın üst kısmında yer alma.
-- **Digit Ratio (-20p):** Çok fazla rakam içermesi (Adres veya Iban olma ihtimali).
-- **Garbage Filter:** Kargo şirketleri (Aras, Yurtiçi) ve platform isimleri (Trendyol) elenir.
+V5 mimarisi, fatura metnini **koordinat-farkında (spatial-aware)** bir şekilde işleyen 5 ana bileşenden oluşur:
 
-### 5.2. GarbageFilter
-Ayrıştırma öncesi metin kirliliğini temizleyen dinamik filtreleme:
-- "SAYIN", "ADRES", "TEL", "MERSİS" gibi anahtar kelimelerin temizlenmesi.
-- Müşteri bilgilerinin (Alici) tedarikçi ile karışmasını engelleyen bağlam kontrolü.
+#### 📦 BlockClusterer
+Görsel metin bloklarını semantik olarak kümeleyerek paragraflar oluşturur.
 
-## 6. Proje Yapısı ve Dosya Rehberi
+**Kümeleme Mantığı:**
+- **Dikey Birleştirme:** Aynı paragraftaki satırlar (1.5x satır yüksekliği toleransı)
+- **Yatay Birleştirme:** Aynı satırdaki kelimeler (0.10 normalized units)
+- **Hizalama Tespiti:** Sol, sağ veya merkez hizalama kontrolü
+
+```swift
+public struct BlockClusterer {
+    public func performClustering(_ blocks: [TextBlock]) -> [SemanticBlock]
+}
+```
+
+#### 🏷️ BlockLabeler
+Her semantik bloğa anlamsal etiket atar (Seller, Buyer, Meta, Totals, etc.).
+
+**Puanlama Sistemi:**
+| Sinyal Tipi | Örnek | Ağırlık |
+|-------------|-------|---------|
+| **Pozisyon** | Üst-sol kadran (Satıcı) | +40 |
+| **Anahtar Kelime** | "VKN", "MERSIS" | +30 |
+| **Çoklu Sinyal** | 3+ satıcı anahtar kelimesi | Override |
+| **Negatif Sinyal** | "SAYIN" (Alıcı) | -30 |
+
+```swift
+public enum BlockLabel: String, CaseIterable {
+    case seller, buyer, meta, totals, ettn, noise, content, unknown
+}
+```
+
+#### 🗺️ LayoutMap
+Belgenin 2D uzamsal haritasını oluşturur (sol/sağ kolon, tam genişlik blokları).
+
+**Zone Tanımları:**
+- **Üst Bölge (Y < 0.35):** ETTN, Fatura Meta, Satıcı Bilgileri
+- **Orta Bölge (0.35 ≤ Y ≤ 0.65):** Alıcı, Ürün Tablosu
+- **Alt Bölge (Y > 0.65):** Toplam Tutarlar, Footer
+
+#### 🔍 SpatialParser
+V5 Orkestratörü: Tüm pipeline'ı koordine eder ve veri çıkarımını yapar.
+
+**Çıkarım Stratejisi:**
+1. Etiketli blokları öncelikle kullan
+2. Fallback: Tüm metinde regex taraması
+3. Tutar doğrulama: AmountToTextVerifier entegrasyonu
+
+#### ✅ AmountToTextVerifier
+Fatura dipnotundaki "Yalnız..." satırı ile sayısal tutarı karşılaştırır.
+
+**Doğrulama Akışı:**
+```
+Sayısal: 159.53 TL
+   ↓
+Türkçe Dönüşüm: "YÜZ ELLİ DOKUZ TL ELLİ ÜÇ KURUŞ"
+   ↓
+Belgedeki "Yalnız..." Satırı İle Karşılaştırma
+   ↓
+Benzerlik Oranı ≥ %80 → Doğrulandı ✓
+```
+
+---
+
+## 5. Proje Yapısı ve Dosya Rehberi
 
 Proje, Clean Architecture ve MVVM-R prensiplerine uygun olarak modüler bir yapıda organize edilmiştir.
 
-### 6.1. Ana Klasör Yapısı (InvoScanner/)
+### 5.1. Ana Klasör Yapısı (InvoScanner/)
 
-#### 📂 Models/ (Veri Katmanı)
-- **`Invoice.swift`:** Faturanın tüm ayıklanmış verilerini (ETTN, Toplam, Tarih vb.) ve SwiftData şemasını tutan ana model.
-- **`SellerProfile.swift`:** Sık karşılaşılan tedarikçilerin (Trendol, Getir vb.) profil bilgilerini ve özel eşleşme kurallarını tutar.
-- **`TextBlock.swift`:** Vision veya PDF'den gelen metin parçalarını, koordinatlarını ve normalizasyon bilgilerini kapsülleyen yardımcı model.
+```
+InvoScanner/
+├── InvoScannerApp.swift          # Uygulama giriş noktası
+├── ContentView.swift             # Ana görünüm
+├── Core/                         # Merkezi servisler
+│   ├── InputManager.swift        # Girdi yönetimi (PDF, Galeri, Kamera)
+│   └── ExtractionConstants.swift # Sabitler ve desenler
+├── Spatial/                      # V5 Pipeline bileşenleri
+│   ├── SpatialModels.swift       # TextBlock, SemanticBlock, BlockLabel
+│   ├── BlockClusterer.swift      # Metin bloğu kümeleme
+│   ├── BlockLabeler.swift        # Semantik etiketleme
+│   ├── LayoutMap.swift           # 2D belge haritası
+│   ├── SpatialParser.swift       # V5 Orkestratör
+│   └── AmountToTextVerifier.swift # Tutar doğrulama
+├── Models/                       # Veri modelleri
+│   └── Invoice.swift             # Fatura modeli
+├── ViewModels/                   # UI State yönetimi
+│   ├── DashboardViewModel.swift  # Dashboard istatistikleri
+│   └── ScannerViewModel.swift    # Tarama state'i
+├── Views/                        # SwiftUI arayüzleri
+│   ├── DashboardView.swift       # Ana ekran
+│   ├── ScannerView.swift         # Tarama arayüzü
+│   ├── InvoiceListView.swift     # Fatura listesi
+│   ├── InvoiceDetailView.swift   # Fatura detayları
+│   └── Components/               # Yeniden kullanılabilir bileşenler
+└── Assets.xcassets/              # Görsel varlıklar
+```
 
-#### 📂 Services/ (İş Mantığı ve Servisler)
-- **`InputManager.swift`:** Tüm girdi (PDF, Galeri, Kamera) akışını yöneten Facade sınıfı.
-- **`OCRService.swift`:** Vision Framework kullanarak görselleri `[TextBlock]` listesine dönüştürür.
-- **`InvoiceParser.swift`:** Ayrıştırma sürecini koordine eden, stratejileri çağıran orkestratör.
-- **`LineInjector.swift`:** Dağınık metin bloklarını satır bazlı olarak birleştirir ve hizalar.
-- **`ZoneClassifier.swift`:** Belgeyi Header, Supplier, Footer gibi bölgelere ayırır.
-- **`GarbageFilter.swift`:** Veri ayıklama sırasında gürültü (reklam, adres vb.) yaratan kelimeleri eler.
-- **`SupplierQualityScorer.swift`:** Tedarikçi adaylarını doğruluk oranına göre skorlar.
-- **`TextNormalizer.swift`:** Türkçe karakterleri ve sayısal formatları standartlaştırır.
-- **`StrategyResolver.swift`:** Belge tipine göre hangi stratejinin kullanılacağına karar verir.
+### 5.2. Modül Detayları
 
-#### 📂 Strategies/ (Ayrıştırma Stratejileri)
-- **`Protocols/`:** `ExtractionStrategy` ve `InvoiceExtractionStrategy` gibi arayüzleri içerir.
-- **`Field/`:** Her bir alan (Amount, Date, ETTN, Supplier) için özelleşmiş atomik stratejiler.
-- **`Document/`:** Kuruma özel (Trendyol, Hepsiburada) veya genel (`GenericStrategy`) belge bazlı stratejiler.
+#### 📂 Core/ (Merkezi Servisler)
 
-#### 📂 ViewModels/ (Sunum Mantığı)
-- **`DashboardViewModel.swift`:** İstatistiklerin hesaplanması ve grafik verilerinin hazırlanması.
-- **`ScannerViewModel.swift`:** Tarama sürecinin state yönetimi (Loading, Success, Error).
+| Dosya | Sorumluluk |
+|-------|------------|
+| `InputManager.swift` | Tüm girdi kaynaklarını (PDF, Galeri, Kamera) normalize eden Facade sınıfı. PDFInputProvider, ImageInputProvider, GalleryInputProvider protokolleri. |
+| `ExtractionConstants.swift` | Adres işaretçileri, kurumsal sonekler, kargo firmaları, vergi göstergeleri gibi merkezi sabitler. |
 
-#### 📂 Views/ (UI Bileşenleri)
-- **`DashboardView.swift`:** Harcama grafiklerinin ve özet kartların yer aldığı ana ekran.
-- **`ScannerView.swift`:** Belge yükleme ve canlı tarama arayüzü.
-- **`InvoiceListView.swift`:** Kayıtlı faturaların listelendiği, arama ve filtreleme yapılabilen ekran.
-- **`InvoiceDetailView.swift`:** Fatura detaylarının ve ayıklanan verilerin doğrulandığı görünüm.
-- **`Components/`:** Uygulama genelinde kullanılan buton, kart ve liste elemanları.
+#### 📂 Spatial/ (V5 Pipeline)
 
-### 6.2. Test Katmanı (InvoScannerTests/)
+| Dosya | Satır Sayısı | Sorumluluk |
+|-------|--------------|------------|
+| `SpatialModels.swift` | ~270 | TextBlock, SemanticBlock, BlockLabel veri yapıları |
+| `BlockClusterer.swift` | ~290 | Metin bloklarını semantik paragraflara kümeleme |
+| `BlockLabeler.swift` | ~360 | Bloklara anlamsal etiket atama (Seller, Buyer, etc.) |
+| `LayoutMap.swift` | ~110 | Sol/sağ kolon ve zone-based erişim |
+| `SpatialParser.swift` | ~690 | V5 Orkestratör, tüm çıkarım mantığı |
+| `AmountToTextVerifier.swift` | ~130 | Sayısal-metin tutar doğrulaması |
 
-- **`StrategyTests.swift`:** Bireysel stratejilerin (Regex, Math Check) birim testleri.
-- **`InputManagerTests.swift`:** Girdi sağlayıcıların ve asenkron yükleme süreçlerinin testleri.
-- **`DataDrivenTests.swift`:** JSON tabanlı mock datalar üzerinden tüm pipeline'ın toplu testi.
-- **`Resources/`:** Testlerde kullanılan örnek fatura dataları (JSON/PDF).
+#### 📂 Models/
 
-## 7. Test ve Verifikasyon Altyapısı
-Proje, yüksek doğruluk oranını korumak için iki katmanlı test sistemine sahiptir:
-1.  **Unit Tests:** Her servisin ve stratejinin tekil doğruluğu.
-2.  **Data-Driven Tests:** `TestCases.json` üzerinden gerçek dünya senaryolarının (mock data) toplu testi.
+| Dosya | Sorumluluk |
+|-------|------------|
+| `Invoice.swift` | Ayıklanan fatura verisini temsil eder. ETTN, tarih, tutar, satıcı ve güven skoru içerir. |
 
-**Build Status:** ✅ Passing (iOS 17+)
-**Test Coverage:** %85+ (Core Logic)
+**Güven Skoru Formülü:**
+```swift
+var confidenceScore: Double {
+    ETTN (+0.20) + Date (+0.15) + Amount (+0.25) + Supplier (+0.20) + Verification Bonus (+0.20)
+}
+// Maksimum: 1.0, Otomatik Onay Eşiği: ≥ 0.70
+```
+
+#### 📂 ViewModels/
+
+| Dosya | Sorumluluk |
+|-------|------------|
+| `DashboardViewModel.swift` | İstatistiklerin hesaplanması ve grafik verilerinin hazırlanması |
+| `ScannerViewModel.swift` | Tarama sürecinin state yönetimi (Loading, Success, Error) |
+
+#### 📂 Views/
+
+| Dosya | Sorumluluk |
+|-------|------------|
+| `DashboardView.swift` | Harcama grafiklerinin ve özet kartların yer aldığı ana ekran |
+| `ScannerView.swift` | Belge yükleme ve canlı tarama arayüzü |
+| `InvoiceListView.swift` | Faturaların listelendiği, arama ve filtreleme ekranı |
+| `InvoiceDetailView.swift` | Fatura detayları ve doğrulama görünümü |
 
 ---
-*InvoScanner (V3), fatura verisi ayıklamayı bir "tahmin" olmaktan çıkarıp, matematiksel ve yapısal kurallarla bir "kesinlik" haline dönüştürmektedir.*
+
+## 6. Test Katmanı
+
+### 6.1. Test Dosyaları (InvoScannerTests/)
+
+| Dosya | Tür | Açıklama |
+|-------|-----|----------|
+| `DataDrivenTests.swift` | Entegrasyon | JSON tabanlı mock datalar üzerinden tüm pipeline testi |
+| `GoldenTests.swift` | Altın Standart | Bilinen çıktılar ile karşılaştırmalı testler |
+| `InputManagerTests.swift` | Birim | Girdi sağlayıcıların ve asenkron yükleme süreçlerinin testleri |
+| `Fixtures/` | Mock Data | Test için örnek fatura verileri |
+| `Helpers/` | Yardımcı | Test araçları ve uzantılar |
+
+### 6.2. Test Stratejisi
+
+- **Unit Tests:** Her servisin ve pipeline bileşeninin tekil doğruluğu
+- **Golden Tests:** Gerçek fatura çıktıları ile beklenen sonuçların karşılaştırılması
+- **Data-Driven Tests:** JSON dosyalarından okunan test senaryoları
+
+---
+
+## 7. Teknoloji Yığını
+
+| Kategori | Teknoloji |
+|----------|-----------|
+| **Dil** | Swift 5.10 |
+| **UI Framework** | SwiftUI |
+| **Mimari** | MVVM-R + Strategy Pattern |
+| **OCR** | Vision Framework |
+| **PDF İşleme** | PDFKit |
+| **Görselleştirme** | SwiftCharts |
+| **Minimum iOS** | iOS 17.0+ |
+
+---
+
+## 8. Build ve Dağıtım
+
+| Metrik | Değer |
+|--------|-------|
+| **Build Status** | ✅ Passing (iOS 17+) |
+| **Xcode** | 15.0+ |
+| **Test Coverage** | %85+ (Core Logic) |
+| **Privacy** | 100% On-Device |
+
+---
+
+## 9. Gelecek Sürüm Hedefleri (Roadmap)
+
+- [ ] **V6:** SwiftData Persistence Entegrasyonu
+- [ ] **V6:** Ürün Tablosu (Payload) Çıkarımı
+- [ ] **V7:** Firebase Cloud Backup
+- [ ] **V7:** Multi-Language OCR (İngilizce, Almanca)
+
+---
+
+*InvoScanner V5, fatura verisi ayıklamayı bir "tahmin" olmaktan çıkarıp, koordinat-farkında uzamsal analiz ve matematiksel doğrulama ile bir "kesinlik" haline dönüştürmektedir.*

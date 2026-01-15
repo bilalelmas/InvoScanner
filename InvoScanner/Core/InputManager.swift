@@ -87,7 +87,7 @@ struct PDFInputProvider: InputProviding {
         if cleanText.count > 50 {
             print("PDFInputProvider: PDFKit ile \(cleanText.count) karakter alındı.")
             
-            // V5 FIX: Metni satırlara böl ve yapay koordinat ata
+            // Metni satırlara böl ve yapay koordinat ata
             // Bu sayede SpatialParser spatial analiz yapabilir
             let blocks = convertTextToBlocks(cleanText)
             print("PDFInputProvider: \(blocks.count) satır/blok oluşturuldu")
@@ -119,7 +119,7 @@ struct PDFInputProvider: InputProviding {
         guard !lines.isEmpty else { return [] }
         
         var blocks: [TextBlock] = []
-        // V5.10: Satır birleştirme hassasiyeti düşürüldü
+        // Satır birleştirme hassasiyeti düşürüldü
         // 0.012 hala satırları birleştiriyordu, 0.006'ya düşürülerek
         // birbirine yakın satırların (İsim/Adres) ayrı bloklar olması sağlandı
         let lineHeight: CGFloat = 0.020

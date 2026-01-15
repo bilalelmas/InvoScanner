@@ -40,7 +40,7 @@ struct ExtractionConstants {
         "HIZMETLERI", "HİZMETLERİ"
     ]
     
-    /// V5.12: Şirket türü sonekleri - Tam Sıralı Liste (En Uzun -> En Kısa)
+    /// Şirket türü sonekleri - Tam Sıralı Liste (En Uzun -> En Kısa)
     /// Bu liste, satıcı isminin "Bitiş Çizgisini" belirler.
     static let legalSuffixesOrdered = [
         // 1. En Uzun Varyasyonlar (Kesinlik %100)
@@ -160,7 +160,7 @@ struct ExtractionConstants {
         "FATURA", "FATURA NO"
     ]
     
-    // MARK: - V5.3 Semantik Etiketler
+    // MARK: - Semantik Etiketler
     
     /// Satıcı bölümü işaretçileri (Moonlife, Vestel varyasyonları dahil)
     static let sellerLabels = [
@@ -179,12 +179,12 @@ struct ExtractionConstants {
     /// Fatura meta veri etiketleri
     static let invoiceMetaLabels = [
         "FATURA NO", "FATURA NO:", "FATURA NUMARASI", "FATURA NUMARASI:",
-        "BELGE NO", "BELGE NO:",  // V5.3: Belge numarası varyasyonu
+        "BELGE NO", "BELGE NO:",  // Belge numarası varyasyonu
         "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
         "DÜZENLENME SAATİ", "DUZENLEME SAATI", "DÜZENLEME SAATİ"
     ]
     
-    /// V5.4: Tarih etiketleri (tarih çıkarma için)
+    /// Tarih etiketleri (tarih çıkarma için)
     static let dateLabels = [
         "FATURA TARİHİ", "FATURA TARIHI",
         "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
@@ -192,7 +192,7 @@ struct ExtractionConstants {
         "DATE"
     ]
     
-    /// V5.3: Marka sloganları ve gürültü ifadeleri (satıcı adı temizliği için)
+    /// Marka sloganları ve gürültü ifadeleri (satıcı adı temizliği için)
     static let sloganNoise = [
         // Marka sloganları
         "YEŞİLİ BİRLİKTE YAŞATALIM", "YESILI BIRLIKTE YASATALIM",
@@ -204,7 +204,7 @@ struct ExtractionConstants {
         "SAYFA:", "PAGE:"
     ]
     
-    // MARK: - V5.3 Spatial Thresholds
+    // MARK: - Spatial Thresholds
     
     /// Tepe bölgesi gürültü eşiği (Y < bu değer = tepe bölgesi)
     /// Bu bölgedeki izole sayılar potansiyel gürültü olarak işaretlenir

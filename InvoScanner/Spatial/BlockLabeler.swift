@@ -2,19 +2,19 @@ import Foundation
 import CoreGraphics
 
 // MARK: - ═══════════════════════════════════════════════════════════════════
-// MARK:   V5 Block Labeler - Production Grade
+// MARK:   Block Labeler
 // MARK:   Assigns semantic labels using Position + Content Heuristics
 // MARK: ═══════════════════════════════════════════════════════════════════
 
-/// Production-grade semantic labeling engine.
+/// Konumsal ve içerik tabanlı semantik etiketleme motoru.
 ///
-/// **Scoring System Overview:**
-/// Each candidate label receives a score based on:
-/// 1. **Position Score**: Quadrant-based (top-left, top-right, etc.)
-/// 2. **Content Score**: Keyword matching with weights
-/// 3. **Negative Score**: Contradicting signals reduce confidence
+/// **Puanlama Sistemi:**
+/// Her aday etiket, aşağıdaki kriterlere göre bir puan alır:
+/// 1. **Konum Puanı**: Kadran bazlı (sol-üst, sağ-üst, vb.)
+/// 2. **İçerik Puanı**: Ağırlıklı anahtar kelime eşleştirme
+/// 3. **Negatif Puan**: Çelişen sinyaller güveni düşürür
 ///
-/// The label with the highest score wins.
+/// En yüksek puanı alan etiket kazanır.
 public struct BlockLabeler {
     
     // MARK: - Configuration
@@ -30,7 +30,7 @@ public struct BlockLabeler {
         public let rightThreshold: CGFloat
         
         public static let standard = Config(
-            topThreshold: 0.45,  // V5.1 FIX: Satıcı bilgileri fatuanın üst yarısına yayılabilir
+            topThreshold: 0.45,  // Satıcı bilgileri fatuanın üst yarısına yayılabilir
             bottomThreshold: 0.60,
             leftThreshold: 0.50,
             rightThreshold: 0.50
@@ -47,7 +47,7 @@ public struct BlockLabeler {
     
     /// Seller block signals with weights
     private let sellerSignals: [(keyword: String, weight: Double)] = [
-        // V5.3+ FIX: Explicit seller label
+        // Explicit seller label
         ("SATICI", 50),  // "Satıcı (Merkez):" vb.
         ("VKN", 30),
         ("VERGI KIMLIK", 30),
@@ -152,7 +152,7 @@ public struct BlockLabeler {
         // ──────────────────────────────────────────────────────────────
         // PRIORITY 1: ETTN (UUID Detection) - POSITION INDEPENDENT
         // ──────────────────────────────────────────────────────────────
-        // V5.5: UUID formatı içeren bloklar, konumu ne olursa olsun (sağ, sol, alt, üst)
+        // UUID formatı içeren bloklar, konumu ne olursa olsun (sağ, sol, alt, üst)
         // ETTN olarak etiketlenir. Sadece satıcı bloğu istisnası korunur.
         if containsUUID(text) {
             // Koruma: Uzun blok (3+ satır) ve 2+ satıcı anahtar kelimesi varsa
@@ -162,7 +162,7 @@ public struct BlockLabeler {
                 // Satıcı bloğu olarak devam et, ETTN olarak işaretleme
                 // ETTN küresel arama ile yakalanacak
             } else {
-                // V5.5: Konum kontrolü YOK - UUID varsa ETTN'dir
+                // Konum kontrolü YOK - UUID varsa ETTN'dir
                 return .ettn
             }
         }
@@ -225,7 +225,7 @@ public struct BlockLabeler {
         // Content Score: Seller keywords
         score += calculateContentScore(text: text, signals: sellerSignals)
         
-        // V5.1 FIX: Multi-Keyword Boost
+        // Multi-Keyword Boost
         // Eğer 3+ satıcı anahtar kelimesi varsa, konum ne olursa olsun seller olarak işaretle
         let keywordCount = countSellerKeywords(in: text)
         if keywordCount >= 3 {
@@ -240,7 +240,7 @@ public struct BlockLabeler {
             score -= buyerPenalty * 1.5 // Strong penalty
         }
         
-        // V5.12 GENEL KURAL: Lojistik firmaları Asla Satıcı Olamaz
+        // GENEL KURAL: Lojistik firmaları Asla Satıcı Olamaz
         // Bu kural tüm kargo firmaları için geçerlidir.
         let logisticKeywords = ["GÖNDERİ TAŞIYAN", "GONDERI TASIYAN", "TAŞIYAN", "TASIYAN",
                                 "KARGO", "LOJİSTİK", "LOJISTIK", "NAKLİYE", "NAKLIYE", "DAĞITIM", "DAGITIM"]
@@ -268,7 +268,7 @@ public struct BlockLabeler {
         // Content Score: Buyer keywords
         score += calculateContentScore(text: text, signals: buyerSignals)
         
-        // V5.3+ FIX: "SATICI" kelimesi varsa bu buyer değil seller bloğu
+        // "SATICI" kelimesi varsa bu buyer değil seller bloğu
         // Örn: "Satıcı (Merkez): Moonlıfe Mobilya..." → Seller olmalı
         if text.contains("SATICI") && !text.contains("ALICI") {
             score -= 100 // Strong penalty - bu kesinlikle seller
@@ -320,12 +320,12 @@ public struct BlockLabeler {
     /// Calculates noise candidate score.
     ///
     /// **Content-Only:** IBAN, BANKA, QR markers
-    /// **V5.3:** Top margin isolated numbers (Y < 0.10) are noise
+    /// **** Top margin isolated numbers (Y < 0.10) are noise
     /// No strong position signal (can be anywhere)
     private func calculateNoiseScore(text: String, position: CGPoint? = nil) -> Double {
         var score = calculateContentScore(text: text, signals: noiseSignals)
         
-        // V5.3: Tepe bölgesi izole sayı tespiti
+        // Tepe bölgesi izole sayı tespiti
         // Y < 0.10 ve salt sayı ise bu muhtemelen barkod/tracking number
         if let pos = position, pos.y < ExtractionConstants.topMarginNoiseThreshold {
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)

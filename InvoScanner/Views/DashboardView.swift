@@ -12,8 +12,8 @@ struct DashboardView: View {
     
     @Environment(\.modelContext) private var modelContext
     
-    // Veriler
-    @Query(sort: \SavedInvoice.date, order: .reverse) 
+    // Veriler - createdAt'e göre sıralı (En son kaydedilen en üstte)
+    @Query(sort: \SavedInvoice.createdAt, order: .reverse) 
     private var allInvoices: [SavedInvoice]
     
     @State private var viewModel = DashboardViewModel()
@@ -222,16 +222,17 @@ struct DashboardView: View {
                     .font(.title3.bold())
                     .foregroundStyle(.white)
                 Spacer()
+                Text("\(allInvoices.count) fatura")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.5))
             }
             
-            LazyVStack(spacing: 12) {
-                // Son 5 faturayı göster
-                ForEach(allInvoices.prefix(5)) { invoice in
-                    InvoiceItemRow(invoice: invoice)
-                        .onTapGesture {
-                            selectedInvoice = invoice
-                        }
-                }
+            // Son 10 faturayı göster
+            ForEach(allInvoices.prefix(10)) { invoice in
+                InvoiceItemRow(invoice: invoice)
+                    .onTapGesture {
+                        selectedInvoice = invoice
+                    }
             }
         }
     }

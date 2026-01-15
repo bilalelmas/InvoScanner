@@ -1,9 +1,6 @@
 import Foundation
 
-// MARK: - ═══════════════════════════════════════════════════════════════════
-// MARK:   Amount to Text Verifier - V5 Akademik Doğrulama
-// MARK:   Sayısal tutarı "Yalnız..." satırıyla karşılaştırır
-// MARK: ═══════════════════════════════════════════════════════════════════
+// MARK: - Amount to Text Verifier
 
 /// Tutarın yazıyla doğrulanması (Self-Validation)
 /// Fatura dipnotundaki "Yalnız Yüz Elli Dokuz TL Elli Üç Kuruş" ile
@@ -24,7 +21,7 @@ public struct AmountToTextVerifier {
     
     private let units = ["", "BİR", "İKİ", "ÜÇ", "DÖRT", "BEŞ", "ALTI", "YEDİ", "SEKİZ", "DOKUZ"]
     private let tens = ["", "ON", "YİRMİ", "OTUZ", "KIRK", "ELLİ", "ALTMIŞ", "YETMİŞ", "SEKSEN", "DOKSAN"]
-    private let scales = ["", "BİN", "MİLYON", "MİLYAR"]
+    private let scales = ["", "YÜZ", "BİN", "MİLYON", "MİLYAR"]
     
     // MARK: - Main Verification
     

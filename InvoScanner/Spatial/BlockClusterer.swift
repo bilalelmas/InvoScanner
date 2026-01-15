@@ -1,23 +1,20 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - ═══════════════════════════════════════════════════════════════════
-// MARK:   V5 Block Clusterer - Production Grade
-// MARK:   Merges scattered OCR words into logical paragraphs
-// MARK: ═══════════════════════════════════════════════════════════════════
+// MARK: - Block Clusterer
 
-/// Production-grade block clustering engine for invoice documents.
+/// OCR kelimelerini mantıksal paragraflara birleştiren kümeleme motoru.
 ///
-/// **Algorithm Overview:**
-/// 1. Sort input blocks by Y-coordinate (top-down reading order)
-/// 2. Iteratively merge blocks based on proximity and alignment
-/// 3. Respect column boundaries to prevent cross-column merging
+/// **Algoritma:**
+/// 1. Girdileri Y-koordinatına göre sırala (yukarıdan aşağı okuma sırası)
+/// 2. Yakınlık ve hizalamaya göre blokları birleştir
+/// 3. Sütun sınırlarını koru (sütunlar arası birleşmeyi engelle)
 ///
-/// **Key Thresholds (Magic Numbers):**
-/// - `verticalMergeRatio`: 1.5x average line height for same-paragraph detection
-/// - `horizontalMergeThreshold`: 0.1 normalized units for same-line word merging
-/// - `alignmentThreshold`: 0.05 for left/right/center alignment detection
-/// - `columnSeparator`: 0.45-0.55 is the "dead zone" between columns
+/// **Eşik Değerleri:**
+/// - `verticalMergeRatio`: Aynı paragraf tespiti için 1.5x satır yüksekliği
+/// - `horizontalMergeThreshold`: Aynı satırdaki kelimeleri birleştirmek için 0.1 normalize birim
+/// - `alignmentThreshold`: Sol/sağ/orta hizalama tespiti için 0.05
+/// - `columnSeparator`: Sütunlar arası "ölü bölge" 0.45-0.55
 public struct BlockClusterer {
     
     // MARK: - Configuration
@@ -41,8 +38,7 @@ public struct BlockClusterer {
         /// X-coordinate above which blocks are considered "Right Column"
         public let rightColumnMinX: CGFloat
         
-        /// Maximum X-distance to allow merging (prevents cross-column merges)
-        /// 0.4 = blocks more than 40% page width apart won't merge
+        /// Birleştirme için maksimum X-mesafesi (sütunlar arası birleşmeyi engeller)
         public let maxMergeXDistance: CGFloat
         
         public static let standard = Config(
@@ -77,23 +73,15 @@ public struct BlockClusterer {
         self.config = config
     }
     
-    // MARK: - Main Clustering Entry Point
+    // MARK: - Ana Kümeleme
     
-    /// Clusters raw TextBlocks into SemanticBlocks.
-    ///
-    /// - Parameter blocks: Array of raw OCR-detected text blocks
-    /// - Returns: Array of clustered semantic blocks (paragraphs)
-    ///
-    /// **Algorithm:**
-    /// 1. Sort blocks by Y-coordinate (top to bottom)
-    /// 2. Use greedy merge: for each block, check if it should merge with any existing cluster
-    /// 3. Respect column boundaries to prevent cross-column pollution
+    /// Ham TextBlock'ları SemanticBlock'lara kümeler.
     public static func cluster(blocks: [TextBlock]) -> [SemanticBlock] {
         let clusterer = BlockClusterer()
         return clusterer.performClustering(blocks)
     }
     
-    /// Instance method for clustering with custom configuration
+    /// Özel konfigürasyon ile kümeleme
     public func performClustering(_ blocks: [TextBlock]) -> [SemanticBlock] {
         guard !blocks.isEmpty else { return [] }
         

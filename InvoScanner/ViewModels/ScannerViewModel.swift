@@ -3,16 +3,16 @@ import SwiftUI
 import Combine
 import Vision
 
-// MARK: - Scanner ViewModel (V5 Entegrasyonu)
+// MARK: - Scanner ViewModel (Entegrasyonu)
 
 /// Fatura tarama ve ayrıştırma işlemlerini yöneten ViewModel
-/// V5 Spatial Engine ile entegre çalışır
+/// Spatial Engine ile entegre çalışır
 class ScannerViewModel: ObservableObject {
     @Published var scannedInvoice: Invoice?
     @Published var isScanning = false
     @Published var errorMessage: String?
     
-    // V5: Yeni bileşenler
+    // Yeni bileşenler
     private let inputManager = InputManager()
     private let spatialParser = SpatialParser()
     
@@ -23,7 +23,7 @@ class ScannerViewModel: ObservableObject {
         self.scannedInvoice = nil
         self.errorMessage = nil
         
-        // V5: InputManager ile koordinatlı blok çıkarımı
+        // InputManager ile koordinatlı blok çıkarımı
         inputManager.extractBlocks(from: image) { [weak self] blocks in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -34,7 +34,7 @@ class ScannerViewModel: ObservableObject {
                     return
                 }
                 
-                // V5: SpatialParser ile ayrıştırma
+                // SpatialParser ile ayrıştırma
                 let result = self.spatialParser.parse(blocks)
                 let invoice = Invoice(from: result)
                 
@@ -52,7 +52,7 @@ class ScannerViewModel: ObservableObject {
         self.isScanning = true
         self.errorMessage = nil
         
-        // V5: InputManager ile PDF'den koordinatlı blok çıkarımı
+        // InputManager ile PDF'den koordinatlı blok çıkarımı
         inputManager.extractBlocks(from: pdfURL) { [weak self] blocks in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -63,7 +63,7 @@ class ScannerViewModel: ObservableObject {
                     return
                 }
                 
-                // V5: SpatialParser ile ayrıştırma
+                // SpatialParser ile ayrıştırma
                 let result = self.spatialParser.parse(blocks)
                 let invoice = Invoice(from: result)
                 
@@ -79,7 +79,7 @@ class ScannerViewModel: ObservableObject {
     
     private func debugPrint(_ invoice: Invoice) {
         print("═══════════════════════════════════════")
-        print("ScannerVM [V5]: Fatura Ayrıştırıldı")
+        print("ScannerVM  Fatura Ayrıştırıldı")
         print("  Güven Skoru: \(String(format: "%.2f", invoice.confidenceScore))")
         print("  Otomatik Kabul: \(invoice.isAutoAccepted ? "✓" : "✗")")
         print("───────────────────────────────────────")
