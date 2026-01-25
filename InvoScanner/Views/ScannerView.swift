@@ -3,31 +3,32 @@ import PhotosUI
 import UniformTypeIdentifiers
 import VisionKit
 
-// MARK: - Scanner View (iOS 26 Liquid Glass)
+// MARK: - Tarayıcı Ekranı
 
+/// Fiş ve faturaları taramak için kullanılan ana arayüz
 struct ScannerView: View {
     @StateObject private var viewModel = ScannerViewModel()
     
-    // UI States
+    // UI Durumları
     @State private var showDocumentPicker = false
     @State private var showCamera = false
     @State private var selectedImage: UIImage?
     @State private var selectedPhotoItem: PhotosPickerItem?
     
-    // Navigation
+    // Navigasyon
     @State private var showDetail = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // 1. Atmosfer
+                // Kristal arka plan
                 CrystalBackground()
                 
-                // 2. İçerik
+                // İçerik katmanı
                 VStack(spacing: 40) {
                     
-                    // Başlık
+                    // Başlık bölümü
                     VStack(spacing: 8) {
                         Text("Belge Tara")
                             .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -42,13 +43,12 @@ struct ScannerView: View {
                     
                     Spacer()
                     
-                    // Ana Aksiyonlar
+                    // Ana aksiyon butonları
                     if viewModel.isScanning {
                         glassLoadingView
                     } else {
-                        // 3 Buton Tek Satır
                         HStack(spacing: 16) {
-                            // Kamera Butonu
+                            // Kamera butonu
                             actionButton(
                                 icon: "camera.fill",
                                 title: "Kamera",
@@ -59,7 +59,7 @@ struct ScannerView: View {
                                 }
                             }
                             
-                            // Galeri Butonu (PhotosPicker)
+                            // Galeri seçici (PhotosPicker)
                             PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                                 VStack(spacing: 8) {
                                     Image(systemName: "photo.fill")
@@ -81,7 +81,7 @@ struct ScannerView: View {
                                 .shadow(color: .purple.opacity(0.3), radius: 8, x: 0, y: 4)
                             }
                             
-                            // Dosya / PDF Butonu
+                            // Dosya/PDF butonu
                             actionButton(
                                 icon: "doc.fill",
                                 title: "Dosya",
@@ -94,7 +94,7 @@ struct ScannerView: View {
                     
                     Spacer()
                     
-                    // Alt Bilgi
+                    // Alt bilgilendirme
                     Text("Desteklenenler: Fiş, Fatura, PDF")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.4))
@@ -102,19 +102,17 @@ struct ScannerView: View {
                 }
                 .padding()
             }
-            // Kamera Sheet
+            // Kamera ekranı
             .fullScreenCover(isPresented: $showCamera) {
                 DocumentCameraView(onScanComplete: { images in
                     if let first = images.first {
                         self.selectedImage = first
                         viewModel.scan(image: first)
                     }
-                }, onCancel: {
-                    // İptal
-                })
+                }, onCancel: { })
                 .ignoresSafeArea()
             }
-            // Dosya Seçici Sheet
+            // Dosya seçici
             .sheet(isPresented: $showDocumentPicker) {
                 DocumentPicker(selectedImage: $selectedImage, onPDFSelected: { url in
                     viewModel.scan(pdfURL: url)
@@ -122,30 +120,22 @@ struct ScannerView: View {
                     viewModel.scan(image: image)
                 })
             }
-            // Sonuç Detay Sheet (Düzenleme ve Kaydetme)
+            // Sonuç detay ekranı
             .sheet(isPresented: $showDetail, onDismiss: {
-                // Sheet kapandığında (Kaydet veya İptal sonrası) state'i temizle
                 viewModel.scannedInvoice = nil
             }) {
                 if let invoice = viewModel.scannedInvoice {
                     InvoiceDetailView(invoice: invoice, scannedImage: selectedImage, onSave: {
-                        // Kayıt başarılı olduğunda:
-                        // Eğer Dashboard'dan modal olarak açıldıysa bu view'i kapat.
                         dismiss()
                     })
                 }
             }
-            // ViewModel Dinleme
-            .onChange(of: viewModel.scannedInvoice) { oldValue, newValue in
-                if newValue != nil {
-                    showDetail = true
-                }
+            // ViewModel dinleyicileri
+            .onChange(of: viewModel.scannedInvoice) { _, newValue in
+                if newValue != nil { showDetail = true }
             }
-            .onChange(of: viewModel.errorMessage) { oldValue, newValue in
-                // Hata gösterimi eklenebilir (Alert)
-            }
-            // PhotosPicker değişikliği
-            .onChange(of: selectedPhotoItem) { oldValue, newValue in
+            // Galeri seçimi takibi
+            .onChange(of: selectedPhotoItem) { _, newValue in
                 Task {
                     if let item = newValue,
                        let data = try? await item.loadTransferable(type: Data.self),
@@ -160,8 +150,9 @@ struct ScannerView: View {
         }
     }
     
-    // MARK: - Components
+    // MARK: - Alt Bileşenler
     
+    /// Analiz sırasında gösterilen yükleme ekranı
     private var glassLoadingView: some View {
         VStack(spacing: 20) {
             ProgressView()
@@ -182,7 +173,8 @@ struct ScannerView: View {
         )
     }
     
-    private func actionButton(icon: String, title: String, subtitle: String? = nil, color: Color, action: @escaping () -> Void) -> some View {
+    /// Ortak buton tasarımı
+    private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: icon)
@@ -206,9 +198,9 @@ struct ScannerView: View {
     }
 }
 
-// MARK: - Helpers
+// MARK: - Yardımcı Yapılar
 
-// Basit Belge Seçici Sarmalayıcı
+/// Dosya ve PDF seçici sarmalayıcısı
 struct DocumentPicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
     var onPDFSelected: (URL) -> Void
@@ -222,34 +214,21 @@ struct DocumentPicker: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
     
-    func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let parent: DocumentPicker
-        
-        init(parent: DocumentPicker) {
-            self.parent = parent
-        }
+        init(parent: DocumentPicker) { self.parent = parent }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
-            
-            let didStartAccessing = url.startAccessingSecurityScopedResource()
+            let access = url.startAccessingSecurityScopedResource()
             
             if url.pathExtension.lowercased() == "pdf" {
-                if didStartAccessing {
-                    url.stopAccessingSecurityScopedResource()
-                }
+                if access { url.stopAccessingSecurityScopedResource() }
                 parent.onPDFSelected(url)
             } else {
-                defer {
-                    if didStartAccessing {
-                        url.stopAccessingSecurityScopedResource()
-                    }
-                }
-                
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
                 if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
                     parent.selectedImage = image
                     parent.onImageSelected(image)
@@ -259,10 +238,8 @@ struct DocumentPicker: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - Document Camera View (VNDocumentCameraViewController Wrapper)
-
+/// Doküman kamerası sarmalayıcısı (VNDocumentCamera)
 struct DocumentCameraView: UIViewControllerRepresentable {
-    
     var onScanComplete: ([UIImage]) -> Void
     var onCancel: () -> Void
     
@@ -274,9 +251,7 @@ struct DocumentCameraView: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {}
     
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onScanComplete: onScanComplete, onCancel: onCancel)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(onScanComplete: onScanComplete, onCancel: onCancel) }
     
     class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
         let onScanComplete: ([UIImage]) -> Void
@@ -289,33 +264,18 @@ struct DocumentCameraView: UIViewControllerRepresentable {
         
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
             var images: [UIImage] = []
-            for pageIndex in 0..<scan.pageCount {
-                images.append(scan.imageOfPage(at: pageIndex))
-            }
-            controller.dismiss(animated: true) { [weak self] in
-                self?.onScanComplete(images)
-            }
+            for i in 0..<scan.pageCount { images.append(scan.imageOfPage(at: i)) }
+            controller.dismiss(animated: true) { [weak self] in self?.onScanComplete(images) }
         }
         
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-            controller.dismiss(animated: true) { [weak self] in
-                self?.onCancel()
-            }
+            controller.dismiss(animated: true) { [weak self] in self?.onCancel() }
         }
         
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
-            print("DocumentCamera Hatası: \(error.localizedDescription)")
-            controller.dismiss(animated: true) { [weak self] in
-                self?.onCancel()
-            }
+            controller.dismiss(animated: true) { [weak self] in self?.onCancel() }
         }
     }
     
-    static var isSupported: Bool {
-        VNDocumentCameraViewController.isSupported
-    }
-}
-
-#Preview {
-    ScannerView()
+    static var isSupported: Bool { VNDocumentCameraViewController.isSupported }
 }

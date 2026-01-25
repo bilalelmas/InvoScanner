@@ -2,65 +2,62 @@ import Foundation
 import SwiftData
 import UIKit
 
-/// Kalıcı olarak saklanan fatura verisi
-/// - Hibrit Depolama: Metadata SwiftData'da, görsel FileManager'da
+/// Kalıcı fatura modeli
+/// Hibrit depolama (Data + Disk)
 @Model
 final class SavedInvoice {
     
-    // MARK: - Primary Key
+    // MARK: - Kimlik
     
-    /// Benzersiz tanımlayıcı
+    /// ID
     @Attribute(.unique) var id: UUID
     
-    // MARK: - Invoice Data
+    // MARK: - Veri
     
-    /// Satıcı/Tedarikçi adı
+    /// Satıcı adı
     var supplierName: String?
     
-    /// Toplam tutar (TRY)
+    /// Tutar
     var totalAmount: Decimal?
     
-    /// Fatura tarihi
+    /// Tarih
     var date: Date?
     
-    /// ETTN (Elektronik Fatura Takip Numarası) - UUID olarak string saklanır
+    /// ETTN (UUID string)
     var ettn: String?
     
-    /// Fatura numarası
+    /// Fatura No
     var invoiceNumber: String?
     
-    // MARK: - Hybrid Storage Reference
+    // MARK: - Dosya Referansı
     
-    /// Disk'teki görsel dosyasının adı (e.g., "uuid.jpg")
-    /// - Note: Görsel veritabanında saklanmaz, performans için FileManager kullanılır
+    /// Görsel dosya adı
+    /// Veritabanı dışı saklama (FileManager)
     var imageFileName: String?
     
-    // MARK: - Metadata
+    // MARK: - Meta Veri
     
-    /// Kayıt oluşturulma tarihi
+    /// Oluşturulma tarihi
     var createdAt: Date
     
-    /// Otomatik onay durumu (güven skoru >= 0.70)
+    /// Otomatik onay durumu
     var isAutoAccepted: Bool
     
-    // MARK: - Computed (Transient, not stored)
+    // MARK: - Geçici Veri
     
-    /// Disk'ten yüklenen görsel (lazy loading)
+    /// Önbellekteki görsel
     @Transient var cachedImage: UIImage?
     
-    // MARK: - Initializers
+    // MARK: - Başlatıcılar
     
-    /// Default initializer (SwiftData için gerekli)
+    /// Varsayılan başlatıcı
     init() {
         self.id = UUID()
         self.createdAt = Date()
         self.isAutoAccepted = false
     }
     
-    /// Convenience initializer - Geçici Invoice struct'ından oluşturur
-    /// - Parameters:
-    ///   - invoice: SpatialParser'dan gelen geçici fatura verisi
-    ///   - imageFileName: Disk'e kaydedilen görsel dosyasının adı
+    /// Invoice nesnesinden oluşturur
     convenience init(from invoice: Invoice, imageFileName: String?) {
         self.init()
         
@@ -73,7 +70,7 @@ final class SavedInvoice {
         self.isAutoAccepted = invoice.isAutoAccepted
     }
     
-    /// Full initializer
+    /// Tam başlatıcı
     convenience init(
         id: UUID = UUID(),
         supplierName: String? = nil,
@@ -96,10 +93,10 @@ final class SavedInvoice {
     }
 }
 
-// MARK: - Conversion to Invoice
+// MARK: - Dönüşüm
 
 extension SavedInvoice {
-    /// SavedInvoice'ı geçici Invoice struct'ına çevirir
+    /// Invoice nesnesine dönüştürür
     func toInvoice() -> Invoice {
         var invoice = Invoice()
         invoice.supplierName = self.supplierName

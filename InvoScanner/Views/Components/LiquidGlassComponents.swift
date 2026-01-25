@@ -1,9 +1,8 @@
 import SwiftUI
 
-// MARK: - Liquid Glass Card
+// MARK: - Cam Kart
 
-/// iOS 26 tarzı cam kart bileşeni
-/// Tüm ekranlarda tutarlı kullanım için tasarlandı
+/// Uygulama genelinde kullanılan cam efektli kart
 struct LiquidGlassCard<Content: View>: View {
     let content: Content
     var padding: CGFloat = 20
@@ -28,9 +27,9 @@ struct LiquidGlassCard<Content: View>: View {
     }
 }
 
-// MARK: - Liquid Glass Button
+// MARK: - Cam Buton
 
-/// iOS 26 tarzı cam buton
+/// Cam efektli ve gradyanlı buton
 struct LiquidGlassButton: View {
     let title: String
     let icon: String?
@@ -74,9 +73,9 @@ struct LiquidGlassButton: View {
     }
 }
 
-// MARK: - Liquid Glass Section Header
+// MARK: - Bölüm Başlığı
 
-/// iOS 26 tarzı bölüm başlığı
+/// Kristal tasarım diline uygun bölüm başlığı
 struct LiquidGlassSectionHeader: View {
     let title: String
     let icon: String?
@@ -97,26 +96,5 @@ struct LiquidGlassSectionHeader: View {
                 .foregroundStyle(.white.opacity(0.8))
             Spacer()
         }
-    }
-}
-
-#Preview {
-    ZStack {
-        CrystalBackground()
-        
-        VStack(spacing: 20) {
-            LiquidGlassCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    LiquidGlassSectionHeader("Örnek Bölüm", icon: "star.fill")
-                    Text("Bu bir liquid glass kart örneğidir.")
-                        .foregroundStyle(.white)
-                }
-            }
-            
-            LiquidGlassButton("Devam Et", icon: "arrow.right", color: .cyan) {
-                print("Tapped")
-            }
-        }
-        .padding()
     }
 }

@@ -1,13 +1,13 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - Layout Map
+// MARK: - Yerleşim Haritası
 
 /// Belgenin 2D uzamsal haritası
 /// Sol ve sağ kolonları, tam genişlikli blokları ve zone bilgilerini tutar
 struct LayoutMap {
     
-    // MARK: - Properties
+    // MARK: - Özellikler
     
     /// Sol kolondaki semantik bloklar (Satıcı, Alıcı, ETTN genellikle burada)
     var leftColumn: [SemanticBlock]
@@ -18,7 +18,7 @@ struct LayoutMap {
     /// Tam genişlikli bloklar (Tablolar, uzun açıklamalar)
     var fullWidthBlocks: [SemanticBlock]
     
-    // MARK: - Computed Properties
+    // MARK: - Hesaplanan Özellikler
     
     /// Tüm bloklar (konum fark etmeksizin)
     var allBlocks: [SemanticBlock] {
@@ -40,7 +40,7 @@ struct LayoutMap {
         rightColumn.first { $0.label == label }
     }
     
-    // MARK: - Zone-Based Access
+    // MARK: - Bölge Bazlı Erişim
     
     /// Üst bölgedeki bloklar (Y < 0.35)
     var topBlocks: [SemanticBlock] {
@@ -57,7 +57,7 @@ struct LayoutMap {
         allBlocks.filter { $0.center.y >= 0.35 && $0.center.y <= 0.65 }
     }
     
-    // MARK: - Factory
+    // MARK: - Fabrika Metodu
     
     /// BlockClusterer çıktısından LayoutMap oluşturur
     static func from(clusteredBlocks: [SemanticBlock]) -> LayoutMap {
@@ -90,11 +90,11 @@ struct LayoutMap {
         )
     }
     
-    // MARK: - Debug
+    // MARK: - Hata Ayıklama
     
     /// Haritayı okunabilir formatta yazdırır
     func debugPrint() {
-        print("=== Layout Map ===")
+        print("=== Yerleşim Haritası ===")
         print("Sol Kolon (\(leftColumn.count) blok):")
         for (i, block) in leftColumn.enumerated() {
             print("  [\(i)] [\(block.label)] Y:\(String(format: "%.2f", block.center.y)) - \(block.text.prefix(50))...")

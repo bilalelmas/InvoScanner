@@ -1,40 +1,41 @@
 import Foundation
+import UIKit
 import SwiftUI
 import Combine
-import Vision
 
-// MARK: - Scanner ViewModel (Entegrasyonu)
+// MARK: - Scanner ViewModel
 
-/// Fatura tarama ve ayrıştırma işlemlerini yöneten ViewModel
-/// Spatial Engine ile entegre çalışır
+/// Tarama ve ayrıştırma işlemlerini yönetir
 class ScannerViewModel: ObservableObject {
     @Published var scannedInvoice: Invoice?
     @Published var isScanning = false
     @Published var errorMessage: String?
     
-    // Yeni bileşenler
+    // MARK: - Bağımlılıklar
+    
     private let inputManager = InputManager()
     private let spatialParser = SpatialParser()
     
-    // MARK: - UIImage'den Tarama
+    // MARK: - Görsel Tarama
     
+    /// UIImage üzerinden fatura tarar
     func scan(image: UIImage) {
         self.isScanning = true
         self.scannedInvoice = nil
         self.errorMessage = nil
         
-        // InputManager ile koordinatlı blok çıkarımı
+        /// Koordinat bazlı metin ayıklama
         inputManager.extractBlocks(from: image) { [weak self] blocks in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
                 if blocks.isEmpty {
-                    self.errorMessage = "Metin bulunamadı veya okunamadı."
+                    self.errorMessage = "Metin tespit edilemedi."
                     self.isScanning = false
                     return
                 }
                 
-                // SpatialParser ile ayrıştırma
+                /// Uzamsal ayrıştırma (Spatial Parsing)
                 let result = self.spatialParser.parse(blocks)
                 let invoice = Invoice(from: result)
                 
@@ -46,13 +47,14 @@ class ScannerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - PDF'den Tarama
+    // MARK: - PDF Tarama
     
+    /// PDF dosyası üzerinden fatura tarar
     func scan(pdfURL: URL) {
         self.isScanning = true
         self.errorMessage = nil
         
-        // InputManager ile PDF'den koordinatlı blok çıkarımı
+        /// PDF'den metin bloklarını ayıkla
         inputManager.extractBlocks(from: pdfURL) { [weak self] blocks in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -63,7 +65,7 @@ class ScannerViewModel: ObservableObject {
                     return
                 }
                 
-                // SpatialParser ile ayrıştırma
+                /// Uzamsal ayrıştırma
                 let result = self.spatialParser.parse(blocks)
                 let invoice = Invoice(from: result)
                 
@@ -75,11 +77,12 @@ class ScannerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Debug
+    // MARK: - Hata Ayıklama
     
+    /// Ayrıştırma sonuçlarını konsola yazdırır
     private func debugPrint(_ invoice: Invoice) {
         print("═══════════════════════════════════════")
-        print("ScannerVM  Fatura Ayrıştırıldı")
+        print("ScannerVM: Fatura Ayrıştırıldı")
         print("  Güven Skoru: \(String(format: "%.2f", invoice.confidenceScore))")
         print("  Otomatik Kabul: \(invoice.isAutoAccepted ? "✓" : "✗")")
         print("───────────────────────────────────────")

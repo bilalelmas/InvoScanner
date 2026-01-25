@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ayıklanan nihai fatura verisini temsil eder
+/// Ayıklanan fatura verisi
 struct Invoice: Identifiable, Equatable {
     let id = UUID()
     var ettn: UUID?
@@ -9,21 +9,21 @@ struct Invoice: Identifiable, Equatable {
     var totalAmount: Decimal?
     var supplierName: String?
     
-    // Tutar Doğrulama ("Yalnız..." kontrolü)
+    /// Doğrulama durumu
     var isAmountVerified: Bool?
     var amountConfidence: Double?
     
-    // Gelişmiş Güven Skoru (0.0 - 1.0)
+    /// Güven skoru
     var confidenceScore: Double {
         var score = 0.0
         
-        // Temel alan puanları
+        /// Alan bazlı puanlama
         if ettn != nil { score += 0.20 }
         if date != nil { score += 0.15 }
         if totalAmount != nil { score += 0.25 }
         if supplierName != nil { score += 0.20 }
         
-        // Tutar doğrulama bonusu
+        /// Doğrulama bonusu
         if isAmountVerified == true {
             score += 0.20
         } else if let confidence = amountConfidence, confidence > 0.5 {
@@ -33,14 +33,14 @@ struct Invoice: Identifiable, Equatable {
         return min(score, 1.0)
     }
     
-    // Otomatik Onay Eşiği
+    /// Otomatik onay kontrolü
     var isAutoAccepted: Bool {
         return confidenceScore >= 0.70
     }
     
-    // MARK: - Convenience Initializer
+    // MARK: - Başlatıcılar
     
-    /// SpatialParser sonucundan Invoice oluşturur
+    /// Parser sonucundan oluşturur
     init(from result: SpatialParser.ParsedInvoice) {
         if let ettnStr = result.ettn {
             self.ettn = UUID(uuidString: ettnStr)
@@ -50,14 +50,13 @@ struct Invoice: Identifiable, Equatable {
         self.totalAmount = result.totalAmount
         self.supplierName = result.supplier
         
-        // Tutar doğrulama
+        /// Doğrulama süreci
         if let verification = result.amountVerification {
             self.isAmountVerified = verification.isMatch
             self.amountConfidence = verification.confidence
         }
     }
     
-    // Default initializer
+    /// Varsayılan başlatıcı
     init() {}
 }
-

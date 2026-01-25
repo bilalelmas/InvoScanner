@@ -1,12 +1,11 @@
 import Foundation
 
-/// Çıkarım motoru için merkezi sabitler (Centralized Constants)
-/// Tüm desenler (patterns) ve anahtar kelimeler burada toplanmıştır.
+/// Çıkarım motoru için merkezi sabitler
 struct ExtractionConstants {
     
     // MARK: - Adres ve İletişim
     
-    /// Adres verisi işaretçileri (Yapısal)
+    /// Adresi belirten anahtar kelimeler
     static let addressMarkers = [
         "MAH", "MAH.", "MAHALLESI", "MAHALLESİ", "MH.",
         "CAD", "CAD.", "CADDESI", "CADDESİ", "CADDDE",
@@ -17,6 +16,7 @@ struct ExtractionConstants {
         "MEYDAN", "BULVAR", "KUME EVLER"
     ]
     
+    /// İletişim bilgilerini belirten anahtar kelimeler
     static let contactMarkers = [
         "TEL:", "TEL :", "TELEFON:", "TLF",
         "FAX:", "FAX :", "FAKS:",
@@ -27,7 +27,7 @@ struct ExtractionConstants {
     
     // MARK: - Kurumsal ve Vergi
     
-    /// Kurumsal şirket sonekleri
+    /// Şirket unvanı sonekleri
     static let corporateSuffixes = [
         "A.S.", "A.S", "A.Ş.", "AŞ", "AS",
         "LTD.", "LTD", "LIMITED", "LİMİTED",
@@ -40,10 +40,8 @@ struct ExtractionConstants {
         "HIZMETLERI", "HİZMETLERİ"
     ]
     
-    /// Şirket türü sonekleri - Tam Sıralı Liste (En Uzun -> En Kısa)
-    /// Bu liste, satıcı isminin "Bitiş Çizgisini" belirler.
+    /// Şirket türü sonekleri (Sıralı liste)
     static let legalSuffixesOrdered = [
-        // 1. En Uzun Varyasyonlar (Kesinlik %100)
         "SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
         "SANAYI VE TICARET LIMITED SIRKETI",
         "SANAYİ VE TİCARET ANONİM ŞİRKETİ",
@@ -58,16 +56,12 @@ struct ExtractionConstants {
         "HIZMETLERI LIMITED SIRKETI",
         "MAĞAZACILIK LİMİTED ŞİRKETİ",
         "MAGAZACILIK LIMITED SIRKETI",
-        
-        // 2. Orta Varyasyonlar (SAN. VE TİC. kombinasyonları)
         "SAN. VE TİC. LTD. ŞTİ.",
         "SAN. VE TIC. LTD. STI.",
         "SANAYİ VE TİCARET A.Ş.",
         "SANAYI VE TICARET A.S.",
         "SAN. VE TİC. A.Ş.",
         "SAN. VE TIC. A.S.",
-        
-        // 3. Orta Varyasyonlar (Temel formlar)
         "LİMİTED ŞİRKETİ",
         "LIMITED SIRKETI",
         "ANONİM ŞİRKETİ",
@@ -82,8 +76,6 @@ struct ExtractionConstants {
         "LTD.STI.",
         "LTD ŞTİ",
         "LTD STI",
-        
-        // 4. Kısa formlar (Dikkatli Kullanılmalı)
         "A.Ş.",
         "A.S.",
         "AŞ.",
@@ -96,7 +88,7 @@ struct ExtractionConstants {
         "STI."
     ]
     
-    /// Vergi ve yasal kimlik işaretçileri
+    /// Vergi ve kimlik işaretçileri
     static let taxIndicators = [
         "VKN", "VKN:", "VERGI NO", "VERGİ NO",
         "TCKN", "TCKN:", "TC NO", "TC KIMLIK",
@@ -104,9 +96,9 @@ struct ExtractionConstants {
         "MERSIS", "MERSİS", "TICARET SICIL", "SICIL NO"
     ]
     
-    // MARK: - Filtreleme (Stop/Exclude)
+    // MARK: - Filtreleme
     
-    /// Satıcı tespitinde "Dur" kelimeleri (Alıcı veya Belge başlangıcı)
+    /// Durdurma kelimeleri (Alıcı veya Belge başlangıcı)
     static let stopPatterns = [
         "SAYIN", "SAYIN:",
         "ALICI", "ALICI:",
@@ -115,9 +107,8 @@ struct ExtractionConstants {
         "FATURA", "E-ARSIV", "EARSIV", "E-FATURA"
     ]
     
-    /// Satıcı olamayacak kargo ve pazar yeri firmaları
+    /// Hariç tutulacak kargo ve pazar yeri firmaları
     static let excludedCompanies = [
-        // Kargo Firmaları
         "PTT", "POSTA VE TELGRAF",
         "ARAS KARGO", "YURTICI KARGO", "YURTİÇİ KARGO",
         "MNG KARGO", "SURAT KARGO", "SÜRAT KARGO",
@@ -126,8 +117,6 @@ struct ExtractionConstants {
         "SENDEO", "KARGOIST", "KARGOİST",
         "KOLAY GELSIN", "KOLAY GELSİN",
         "TRENDYOL EXPRESS", "TEX",
-        
-        // Pazar Yerleri (Genellikle aracıdır)
         "TRENDYOL", "DSM GRUP",
         "HEPSIBURADA", "HEPSİBURADA", "D-MARKET",
         "N11", "DOGUS PLANET",
@@ -137,7 +126,7 @@ struct ExtractionConstants {
         "YEMEK SEPETI"
     ]
     
-    /// Kargo ile ilgili kelimeler (Satır eleme için)
+    /// Kargo ilgili anahtar kelimeler
     static let cargoKeywords = [
         "GONDERI", "GÖNDERİ",
         "TASIYAN", "TAŞIYAN",
@@ -145,8 +134,9 @@ struct ExtractionConstants {
         "DESI", "AGIRLIK", "PAKET"
     ]
     
-    // MARK: - Footer & Belge Tipi
+    // MARK: - Alt Bilgi ve Belge Tipi
     
+    /// Belge sonu anahtar kelimeleri
     static let footerKeywords = [
         "GIB", "GİB",
         "GELIR IDARESI", "GELİR İDARESİ",
@@ -154,6 +144,7 @@ struct ExtractionConstants {
         "ZAMAN DAMGASI", "E-IMZA", "E-İMZA"
     ]
     
+    /// Belge tipini belirten anahtar kelimeler
     static let documentTypeKeywords = [
         "ARSIV FATURA", "ARŞİV FATURA",
         "E-ARSIV", "E-ARŞİV",
@@ -162,29 +153,29 @@ struct ExtractionConstants {
     
     // MARK: - Semantik Etiketler
     
-    /// Satıcı bölümü işaretçileri (Moonlife, Vestel varyasyonları dahil)
+    /// Satıcı etiketi varyasyonları
     static let sellerLabels = [
         "SATICI", "SATICI:", "SATICI (MERKEZ):", "SATICI(MERKEZ):",
         "İŞLETME MERKEZİ", "ISLETME MERKEZI",
         "SATICININ", "SATICININ:"
     ]
     
-    /// Alıcı bölümü işaretçileri (Hepsiburada varyasyonu dahil)
+    /// Alıcı etiketi varyasyonları
     static let buyerLabels = [
         "ALICI", "ALICI:", "ALICI (ŞUBE):", "ALICI(ŞUBE):",
         "MÜŞTERİ V.D. VKN/TCKN", "MUSTERI V.D. VKN/TCKN",
         "MÜŞTERİ VD VKN", "MUSTERI VD VKN"
     ]
     
-    /// Fatura meta veri etiketleri
+    /// Fatura detay etiketleri
     static let invoiceMetaLabels = [
         "FATURA NO", "FATURA NO:", "FATURA NUMARASI", "FATURA NUMARASI:",
-        "BELGE NO", "BELGE NO:",  // Belge numarası varyasyonu
+        "BELGE NO", "BELGE NO:",
         "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
         "DÜZENLENME SAATİ", "DUZENLEME SAATI", "DÜZENLEME SAATİ"
     ]
     
-    /// Tarih etiketleri (tarih çıkarma için)
+    /// Tarih bilgisini belirten etiketler
     static let dateLabels = [
         "FATURA TARİHİ", "FATURA TARIHI",
         "DÜZENLENME TARİHİ", "DUZENLEME TARIHI", "DÜZENLEME TARİHİ",
@@ -192,21 +183,18 @@ struct ExtractionConstants {
         "DATE"
     ]
     
-    /// Marka sloganları ve gürültü ifadeleri (satıcı adı temizliği için)
+    /// Temizlenecek slogan ve gürültü metinleri
     static let sloganNoise = [
-        // Marka sloganları
         "YEŞİLİ BİRLİKTE YAŞATALIM", "YESILI BIRLIKTE YASATALIM",
         "GÜVENİLİR ALIŞVERİŞ", "GUVENILIR ALISVERIS",
         "GÜVENİL ALIŞVERİŞ", "GUVENIL ALISVERIS",
         "MOBİLYA AŞKI", "MOBILYA ASKI",
-        // Sayfa numaraları
         "SAYFA 1", "SAYFA 1/1", "PAGE 1", "PAGE 1/1",
         "SAYFA:", "PAGE:"
     ]
     
-    // MARK: - Spatial Thresholds
+    // MARK: - Uzamsal Eşikler
     
-    /// Tepe bölgesi gürültü eşiği (Y < bu değer = tepe bölgesi)
-    /// Bu bölgedeki izole sayılar potansiyel gürültü olarak işaretlenir
+    /// Tepe bölgesi gürültü eşiği
     static let topMarginNoiseThreshold: CGFloat = 0.10
 }

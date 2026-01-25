@@ -12,7 +12,7 @@ import SwiftData
 struct InvoScannerApp: App {
     
     init() {
-        // Neo-Glass UI: TabBar için Cam Efekti
+        // TabBar için cam efekti (Liquid Glass)
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithTransparentBackground()
         tabAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
@@ -20,7 +20,7 @@ struct InvoScannerApp: App {
         UITabBar.appearance().standardAppearance = tabAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabAppearance
         
-        // NavigationBar için Şeffaflık (Varsayılan)
+        // NavigationBar görünümü
         let navAppearance = UINavigationBarAppearance()
         navAppearance.configureWithTransparentBackground()
         navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
@@ -34,7 +34,7 @@ struct InvoScannerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.dark) // Crystal UI için Dark Mode zorunlu
+                .preferredColorScheme(.dark) // Liquid Glass için karanlık mod zorunlu
         }
         // SwiftData: Fatura verilerini kalıcı olarak saklamak için model container
         .modelContainer(for: SavedInvoice.self)

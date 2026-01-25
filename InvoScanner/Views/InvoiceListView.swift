@@ -1,20 +1,18 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Invoice List View (Neo-Glass)
+// MARK: - Fatura Listesi
 
-/// Fatura listesi - Crystal UI
-/// - List yerine ScrollView + LazyVStack
-/// - Özel Cam Arama Çubuğu
+/// Tüm faturaların listelendiği cam efektli ekran
 struct InvoiceListView: View {
     
-    // MARK: - SwiftData Query
+    /// Veritabanı sorgusu (Tarihe göre ters sıralı)
     @Query(sort: \SavedInvoice.date, order: .reverse)
     private var savedInvoices: [SavedInvoice]
     
     @Environment(\.modelContext) private var modelContext
     
-    // MARK: - State
+    // Filtreleme ve arama durumları
     @State private var searchText = ""
     @State private var selectedFilter: InvoiceFilter = .all
     @State private var selectedInvoice: SavedInvoice?
@@ -22,17 +20,17 @@ struct InvoiceListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // 1. Arka Plan
+                // Kristal arka plan
                 CrystalBackground()
                 
-                // 2. İçerik
+                // İçerik hiyerarşisi
                 VStack(spacing: 0) {
-                    // Custom Search Bar
+                    // Özel arama çubuğu
                     glassSearchBar
                         .padding(.horizontal)
                         .padding(.top)
                     
-                    // Filtre Segmentleri
+                    // Filtreleme seçenekleri
                     Picker("Filtre", selection: $selectedFilter) {
                         ForEach(InvoiceFilter.allCases, id: \.self) { filter in
                             Text(filter.title).tag(filter)
@@ -41,10 +39,10 @@ struct InvoiceListView: View {
                     .pickerStyle(.segmented)
                     .padding()
                     
+                    // Liste veya boş durum
                     if filteredInvoices.isEmpty {
                         emptyStateView
                     } else {
-                        // List yapısı (Swipe-to-delete için)
                         List {
                             ForEach(filteredInvoices) { invoice in
                                 InvoiceItemView(invoice: invoice)
@@ -57,7 +55,7 @@ struct InvoiceListView: View {
                             .onDelete(perform: deleteInvoices)
                         }
                         .listStyle(.plain)
-                        .scrollContentBackground(.hidden) // List arka planını gizle
+                        .scrollContentBackground(.hidden)
                     }
                 }
             }
@@ -71,7 +69,8 @@ struct InvoiceListView: View {
         }
     }
     
-    // MARK: - Delete Handler
+    // MARK: - Silme İşlemi
+    
     private func deleteInvoices(at offsets: IndexSet) {
         for index in offsets {
             let invoice = filteredInvoices[index]
@@ -79,8 +78,9 @@ struct InvoiceListView: View {
         }
     }
     
-    // MARK: - Components
+    // MARK: - Alt Bileşenler
     
+    /// Cam efektli arama çubuğu
     private var glassSearchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
@@ -88,7 +88,7 @@ struct InvoiceListView: View {
             
             TextField("Satıcı veya tutar ara...", text: $searchText)
                 .foregroundStyle(.white)
-                .tint(.cyan) // İmleç rengi
+                .tint(.cyan)
             
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
@@ -106,7 +106,7 @@ struct InvoiceListView: View {
         )
     }
     
-    // Yardımcı View: Thumbnail yükleme lojistiğini yönetir
+    /// Liste satırı (Görsel yükleme yönetimiyle)
     struct InvoiceItemView: View {
         let invoice: SavedInvoice
         @State private var thumbnail: UIImage?
@@ -124,6 +124,7 @@ struct InvoiceListView: View {
             }
         }
         
+        /// Diskten küçük resmi yükler
         private func loadThumbnail() async {
             guard let fileName = invoice.imageFileName else { return }
             let image = await Task.detached(priority: .background) {
@@ -133,6 +134,7 @@ struct InvoiceListView: View {
         }
     }
     
+    /// Veri yoksa veya arama sonucu boşsa gösterilir
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -148,8 +150,9 @@ struct InvoiceListView: View {
         }
     }
     
-    // MARK: - Logic
+    // MARK: - Mantıksal Filtreleme
     
+    /// Arama ve kategori filtrelerini uygulayan liste
     private var filteredInvoices: [SavedInvoice] {
         var result = Array(savedInvoices)
         
@@ -178,6 +181,7 @@ struct InvoiceListView: View {
         return result
     }
     
+    /// Faturayı ve ilişkili görseli siler
     private func deleteInvoice(_ invoice: SavedInvoice) {
         if let fileName = invoice.imageFileName {
             ImageStorageService.shared.delete(fileName: fileName)
@@ -186,7 +190,8 @@ struct InvoiceListView: View {
     }
 }
 
-// Filter enum aynı kalıyor
+// MARK: - Filtre Seçenekleri
+
 enum InvoiceFilter: CaseIterable {
     case all
     case thisMonth
@@ -199,9 +204,4 @@ enum InvoiceFilter: CaseIterable {
         case .highValue: return "1000₺+"
         }
     }
-}
-
-#Preview {
-    InvoiceListView()
-        .modelContainer(for: SavedInvoice.self, inMemory: true)
 }

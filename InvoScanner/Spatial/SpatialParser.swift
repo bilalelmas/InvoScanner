@@ -87,7 +87,11 @@ struct SpatialParser {
                 result.supplier = name
             }
         }
-        // Fallback 2: Şahıs faturaları için - buyer bloğunun ilk satırı
+        // Fallback 2: Sol üst bölgeden akıllı çıkarım (YENİ)
+        if result.supplier == nil {
+            result.supplier = extractSupplierFromTopLeft(layoutMap: layoutMap)
+        }
+        // Fallback 3: Şahıs faturaları için - buyer bloğunun geçerli isim satırı
         if result.supplier == nil {
             if let buyerBlock = layoutMap.leftBlock(withLabel: .buyer) {
                 result.supplier = extractFirstMeaningfulLine(from: buyerBlock.text)
@@ -135,19 +139,19 @@ struct SpatialParser {
     // MARK: - Extraction Helpers
     
     private func extractETTN(from text: String) -> String? {
-        // PDF Ligature Temizliği ('ff' -> 'ff')
+        // Karakter ve ligature temizliği
         let cleanText = text
-            .replacingOccurrences(of: "ﬀ", with: "ff")  // Ligature: ff
-            .replacingOccurrences(of: "ﬁ", with: "fi")  // Ligature: fi
-            .replacingOccurrences(of: "ﬂ", with: "fl")  // Ligature: fl
-            .replacingOccurrences(of: "ﬃ", with: "ffi") // Ligature: ffi
-            .replacingOccurrences(of: "ﬄ", with: "ffl") // Ligature: ffl
+            .replacingOccurrences(of: "ﬀ", with: "ff")
+            .replacingOccurrences(of: "ﬁ", with: "fi")
+            .replacingOccurrences(of: "ﬂ", with: "fl")
+            .replacingOccurrences(of: "ﬃ", with: "ffi")
+            .replacingOccurrences(of: "ﬄ", with: "ffl")
             .replacingOccurrences(of: "\n", with: "")
             .replacingOccurrences(of: "\r", with: "")
             .replacingOccurrences(of: " ", with: "")
-            .uppercased() // Regex için hepsini büyük harf yap
+            .uppercased()
         
-        // Önce ETTN etiketli pattern'i dene
+        // Etiketli ETTN araması
         let labeledPattern = "(?:ETTN|ETTV)[:]?([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})"
         if let regex = try? NSRegularExpression(pattern: labeledPattern, options: .caseInsensitive),
            let match = regex.firstMatch(in: cleanText, range: NSRange(cleanText.startIndex..., in: cleanText)),
@@ -155,7 +159,7 @@ struct SpatialParser {
             return String(cleanText[captureRange])
         }
         
-        // Fallback: Herhangi bir UUID pattern'i (ETTN etiketi olmadan)
+        // Ham UUID araması
         let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
         guard let regex = try? NSRegularExpression(pattern: uuidPattern) else { return nil }
         
@@ -168,31 +172,13 @@ struct SpatialParser {
     
     /// Satıcı ismini ayıklar ve temizler
     private func extractSupplierName(from text: String) -> String? {
-        // 1. Satır Satır Analiz (Line-by-Line Analysis)
+        // Satır bazlı analiz
         let lines = text.components(separatedBy: .newlines)
             .map { cleanSellerLabel($0) }
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !isLabelOnlyLine($0) }
         
-        // İsmi bitiren "Terminatör" kelimeler
-        let terminators = [
-            // Adres etiketleri
-            "ADRES", "ADRES:",
-            // Mahalle/Cadde/Sokak
-            "MAH.", "MAHALLE", "MAHALLESİ", "MAHALLESI",
-            "CAD.", "CADDE", "CADDESİ", "CADDESI",
-            "SOK.", "SOKAK", "SOKAĞI", "SOKAGI",
-            "BULVAR", "MEYDAN",
-            // Yapı bilgileri
-            "NO:", "KAT:", "DAİRE", "DAIRE", "APT", "BLOK", "PK:",
-            // İletişim
-            "TEL:", "VKN:", "TCKN:", "VERGİ", "VERGI", "WEB", "E-POSTA",
-            // İl isimleri (adres başlangıcı)
-            "İSTANBUL", "ISTANBUL", "ANKARA", "İZMİR", "IZMIR", "KOCAELİ", "KOCAELI",
-            "BURSA", "ANTALYA", "ADANA", "KONYA", "GAZİANTEP", "GAZIANTEP",
-            // Lojistik kelimeleri (asla isimde olmamalı)
-            "TAŞIYAN", "TASIYAN", "KARGO", "LOJİSTİK", "LOJISTIK", "NAKLİYE", "NAKLIYE"
-        ]
+        guard !lines.isEmpty else { return nil }
         
         // Gürültü kelimeleri
         var noiseWords = [
@@ -216,63 +202,123 @@ struct SpatialParser {
             // Satır tamamen gürültü mü?
             if isNoiseLine(upperLine, prefixes: noiseWords) { continue }
             
-            // Satır İÇİNDE terminatör var mı?
-            var cleanLine = line
-            var foundTerminator = false
+            // Regex ile adres pattern'i tespit et ve kes
+            let cleanLine = cutAtAddressPattern(line)
             
-            for term in terminators {
-                // Boşlukla başlayan kelimeyi ara (kelime sınırı)
-                if let range = upperLine.range(of: " " + term) {
-                    // Terminatörden ÖNCESİNİ al
-                    let cutIndex = line.index(line.startIndex, offsetBy: upperLine.distance(from: upperLine.startIndex, to: range.lowerBound))
-                    cleanLine = String(line[..<cutIndex]).trimmingCharacters(in: .whitespaces)
-                    foundTerminator = true
-                    break
-                }
-                // Satır başında da kontrol et
-                if upperLine.hasPrefix(term) {
-                    cleanLine = ""
-                    foundTerminator = true
-                    break
-                }
-            }
-            
-            // Temizlenmiş satır boşsa
             if cleanLine.isEmpty {
-                if foundTerminator { break }
+                // Adres pattern'i satır başında ise sonraki satırlara geçme
+                if isAddressLine(upperLine) { break }
                 continue
             }
             
             nameParts.append(cleanLine)
             
-            // Terminatör bulunduysa döngüden çık
-            if foundTerminator { break }
+            // Adres kesilmişse döngüden çık
+            if cleanLine.count < line.count { break }
         }
         
-        // 2. Birleştirilmiş ismi al
+        // Birleştirilmiş ismi al
         let fullName = nameParts.joined(separator: " ")
         
-        // 3. Kurumsal Sonek Kontrolü (Hard Cut)
+        // Kurumsal Sonek Kontrolü (Hard Cut)
         if !fullName.isEmpty {
             return cleanLeadingNumbers(cleanSellerLabel(applyHardSuffixCut(fullName)))
         }
         
-        // 4. Şahıs ismi fallback (2-4 kelime, adres/kargo değil)
+        // Şahıs ismi fallback (2-4 kelime, adres/kargo değil)
         if let firstLine = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) {
-            let words = firstLine.split(separator: " ")
-            if words.count >= 2 && words.count <= 4 {
-                let upperFirst = firstLine.uppercased()
-                if !upperFirst.contains("MAH") && !upperFirst.contains("CAD") &&
-                   !upperFirst.contains("SOK") && !upperFirst.contains("NO:") &&
-                   !upperFirst.contains("KARGO") && !upperFirst.contains("TAŞIYAN") &&
-                   !upperFirst.contains("GÖNDERİ") {
-                    return cleanLeadingNumbers(cleanSellerLabel(firstLine))
-                }
+            let cutLine = cutAtAddressPattern(firstLine)
+            if !cutLine.isEmpty {
+                return cleanLeadingNumbers(cleanSellerLabel(cutLine))
             }
-            return cleanLeadingNumbers(cleanSellerLabel(firstLine))
         }
         
         return nil
+    }
+    
+    /// Regex ile adres pattern'ini tespit edip öncesini döndürür
+    /// Örn: "FAZIL CÖMERT FEVZİÇAKMAK MAH." → "FAZIL CÖMERT"
+    private func cutAtAddressPattern(_ text: String) -> String {
+        // Adres pattern'leri (regex) - kelime + adres soneki
+        // [A-ZÇĞIİÖŞÜ]+ = Türkçe büyük harf kelime
+        // Sonra MAH./CAD./SOK. vb.
+        let addressPatterns = [
+            // "XXXX MAH." veya "XXXX MAHALLESİ" pattern'i
+            #"\s+[A-ZÇĞIİÖŞÜa-zçğıiöşü]+\s*(MAH\.|MAHALLESİ|MAHALLESI|MAHALLE)"#,
+            // "XXXX CAD." veya "XXXX CADDESİ" pattern'i
+            #"\s+[A-ZÇĞIİÖŞÜa-zçğıiöşü]+\s*(CAD\.|CADDESİ|CADDESI|CADDE)"#,
+            // "XXXX SOK." veya "XXXX SOKAĞI" pattern'i
+            #"\s+[A-ZÇĞIİÖŞÜa-zçğıiöşü]+\s*(SOK\.|SOKAĞI|SOKAGI|SOKAK)"#,
+            // "XXXX BULVARI" pattern'i
+            #"\s+[A-ZÇĞIİÖŞÜa-zçğıiöşü]+\s*(BULVAR|BULVARI)"#,
+            // e-Arşiv etiketleri
+            #"\s*Mahalle/Semt:"#,
+            #"\s*MAHALLE/SEMT:"#,
+            #"\s*Cadde/Sokak:"#,
+            #"\s*CADDE/SOKAK:"#,
+            // Basit terminatörler (boşlukla)
+            #"\s+ADRES\s*:"#,
+            #"\s+ADRES\b"#,
+            #"\s+NO\s*:"#,
+            #"\s+TEL\s*:"#,
+            #"\s+VKN\s*:"#,
+            #"\s+TCKN\s*:"#
+        ]
+        
+        let upperText = text.uppercased(with: Locale(identifier: "tr_TR"))
+        
+        for pattern in addressPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+               let match = regex.firstMatch(in: upperText, range: NSRange(upperText.startIndex..., in: upperText)) {
+                // Pattern'in başladığı yer
+                let matchStart = match.range.location
+                
+                // Pattern satır başında eşleşirse, tüm satır adres demek
+                if matchStart == 0 {
+                    return ""
+                }
+                
+                // Pattern ortada eşleşirse, öncesini al
+                if let cutIndex = text.index(text.startIndex, offsetBy: matchStart, limitedBy: text.endIndex) {
+                    return String(text[..<cutIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    /// Satırın tamamen adres olup olmadığını kontrol eder
+    private func isAddressLine(_ upperLine: String) -> Bool {
+        // Klasik adres başlangıçları
+        let addressStarters = [
+            "MAH.", "MAHALLE", "CAD.", "CADDE", "SOK.", "SOKAK",
+            "BULVAR", "MEYDAN", "NO:", "KAT:", "DAIRE", "APT", "BLOK"
+        ]
+        
+        for starter in addressStarters {
+            if upperLine.hasPrefix(starter) { return true }
+        }
+        
+        // e-Arşiv adres etiketleri
+        let eArchiveLabels = [
+            "MAHALLE/SEMT:", "MAHALLE/SEMT",
+            "CADDE/SOKAK:", "CADDE/SOKAK",
+            "ADRES:", "ADRES"
+        ]
+        
+        for label in eArchiveLabels {
+            if upperLine.hasPrefix(label) { return true }
+            // Küçük harfli versiyonları da kontrol et
+            if upperLine.lowercased().hasPrefix(label.lowercased()) { return true }
+        }
+        
+        // Posta kodu ile başlıyorsa
+        if upperLine.range(of: #"^\d{5}\b"#, options: .regularExpression) != nil {
+            return true
+        }
+        
+        return false
     }
     
     /// Sonek sonrası kesin kesim (Hard Cut)
@@ -349,8 +395,36 @@ struct SpatialParser {
         return cleaned.trimmingCharacters(in: .whitespaces)
     }
     
+    /// Sol üst bölgeden satıcı ismini akıllı şekilde çıkarır
+    /// Y < 0.40 olan sol kolon bloklarından geçerli isim arar
+    private func extractSupplierFromTopLeft(layoutMap: LayoutMap) -> String? {
+        // Sol üst bölgedeki bloklar (Y < 0.40)
+        let topLeftBlocks = layoutMap.leftColumn.filter { $0.center.y < 0.40 }
+        
+        for block in topLeftBlocks {
+            // buyer veya meta etiketli blokları atla
+            if block.label == .buyer || block.label == .meta || block.label == .ettn { continue }
+            
+            let lines = block.text.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            
+            for line in lines {
+                // Geçerli isim mi kontrol et
+                if isValidPersonOrCompanyName(line) {
+                    let cleaned = cutAtAddressPattern(line)
+                    if !cleaned.isEmpty && cleaned.count > 3 {
+                        return cleanLeadingNumbers(cleanSellerLabel(cleaned))
+                    }
+                }
+            }
+        }
+        
+        return nil
+    }
+    
     /// Bloktan ilk anlamlı satırı al (şahıs faturaları için)
-    /// Etiket satırlarını (XXX:) atlar, ilk gerçek ismi alır
+    /// Etiket satırlarını, tarih/zaman satırlarını atlar, ilk gerçek ismi alır
     private func extractFirstMeaningfulLine(from text: String) -> String? {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -372,14 +446,36 @@ struct SpatialParser {
             #"^ALICI"#
         ]
         
+        // Tarih/zaman/meta pattern'leri (YENİ - atlaması gerekenler)
+        let dateTimeMetaPatterns = [
+            #"^\d{1,2}\.\d{1,2}\.\d{4}"#,        // 17.09.2023
+            #"^\d{4}-\d{2}-\d{2}"#,               // 2023-09-17
+            #"^\d{1,2}:\d{2}"#,                   // 21:03
+            #"^e-[Bb]elge"#,                      // e-Belge
+            #"^E-?ARŞİV"#,                        // E-ARŞİV
+            #"^E-?ARSIV"#,                        // E-ARSIV
+            #"^FATURA\s*(NO|TARİHİ|TARIHI)"#,    // FATURA NO/TARİHİ
+            #"^SENARYO"#,                         // SENARYO:
+            #"^DÜZENLEME"#,                       // DÜZENLEME TARİHİ
+            #"^DUZENLEME"#                        // DUZENLEME TARIHI
+        ]
+        
         for line in lines {
+            // Etiket satırı mı?
             let isLabelLine = labelPatterns.contains { pattern in
                 line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
             }
+            if isLabelLine { continue }
             
-            if !isLabelLine && line.count > 3 {
-                // İlk anlamlı satır - bu isim
-                return cleanLeadingNumbers(line)
+            // Tarih/zaman/meta satırı mı?
+            let isDateTimeMeta = dateTimeMetaPatterns.contains { pattern in
+                line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+            }
+            if isDateTimeMeta { continue }
+            
+            // Geçerli isim mi kontrol et
+            if line.count > 3 && isValidPersonOrCompanyName(line) {
+                return cleanLeadingNumbers(cutAtAddressPattern(line))
             }
         }
         
@@ -424,7 +520,46 @@ struct SpatialParser {
         return true
     }
     
-    /// : Sadece etiket içeren satırları tespit eder (filtrele)
+    /// Satırın geçerli bir şahıs/şirket ismi olup olmadığını kontrol eder
+    /// Tarih, zaman, meta etiket ve adres içeren satırları reddeder
+    private func isValidPersonOrCompanyName(_ text: String) -> Bool {
+        let upper = text.uppercased(with: Locale(identifier: "tr_TR"))
+        
+        // Tarih içeriyorsa geçersiz (17.09.2023 veya 2023-09-17)
+        if text.range(of: #"\d{1,2}\.\d{1,2}\.\d{4}"#, options: .regularExpression) != nil { return false }
+        if text.range(of: #"\d{4}-\d{2}-\d{2}"#, options: .regularExpression) != nil { return false }
+        
+        // Zaman içeriyorsa geçersiz (21:03)
+        if text.range(of: #"\d{1,2}:\d{2}"#, options: .regularExpression) != nil { return false }
+        
+        // Meta etiketleri içeriyorsa geçersiz
+        let metaKeywords = [
+            "E-BELGE", "E-ARŞİV", "E-ARSIV", "E-FATURA",
+            "FATURA NO", "FATURA TARİHİ", "FATURA TARIHI",
+            "SENARYO", "DÜZENLEME", "DUZENLEME",
+            "BELGE TARİHİ", "BELGE TARIHI"
+        ]
+        for keyword in metaKeywords {
+            if upper.contains(keyword) { return false }
+        }
+        
+        // Adres kelimeleri içeriyorsa geçersiz
+        if upper.contains("MAH.") || upper.contains("MAHALLE") { return false }
+        if upper.contains("CAD.") || upper.contains("CADDE") { return false }
+        if upper.contains("SOK.") || upper.contains("SOKAK") { return false }
+        if upper.contains("BULVAR") || upper.contains("MEYDAN") { return false }
+        
+        // Minimum 2 kelime olmalı (tek kelime genellikle isim değil)
+        let words = text.split(separator: " ").filter { $0.count > 1 }
+        if words.count < 1 { return false }
+        
+        // 10'dan fazla kelime muhtemelen adres veya açıklama
+        if words.count > 10 { return false }
+        
+        return true
+    }
+    
+    /// Sadece etiket içeren satırları tespit eder (filtrele)
     private func isLabelOnlyLine(_ line: String) -> Bool {
         let labelPatterns = [
             #"^Vergi\s*Dairesi\s*:"#,
@@ -613,15 +748,12 @@ struct SpatialParser {
         return (invoiceNo, date)
     }
     
-    /// Tarih string'ini Date nesnesine çevirir
-    /// Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+    /// Tarih metnini Date nesnesine dönüştürür
     private func parseDate(_ rawDateStr: String) -> Date? {
         var dateStr = rawDateStr
         
-        // Boşlukları temizle ("20- 08- 2024" → "20-08-2024")
+        // Temizlik işlemleri
         dateStr = dateStr.replacingOccurrences(of: " ", with: "")
-        
-        // Saat bilgisini temizle ("10.06.2024-16:06:26" → "10.06.2024")
         dateStr = dateStr.replacingOccurrences(
             of: #"-\d{2}:\d{2}:\d{2}"#,
             with: "",
@@ -633,7 +765,7 @@ struct SpatialParser {
             options: .regularExpression
         )
         
-        // Karakter normalizasyonu
+        // Ayraç normalizasyonu
         dateStr = dateStr.replacingOccurrences(of: "/", with: ".")
         dateStr = dateStr.replacingOccurrences(of: "-", with: ".")
         
@@ -642,9 +774,9 @@ struct SpatialParser {
         return formatter.date(from: dateStr)
     }
     
-    /// -5.3 FIX: Telefon/TCKN/Tepe bölgesi numarası mı kontrol et
-    /// - 10-11 haneli salt rakam = muhtemelen telefon veya TCKN
-    /// - Salt rakam dizileri (barcode, tracking) fatura no olamaz
+    /// Telefon/TCKN/Tepe bölgesi numarası mı kontrolü
+    /// - 10-11 haneli sayı = telefon veya TCKN
+    /// - Salt rakamlar fatura no olamaz
     private func isPhoneOrTCKN(_ value: String) -> Bool {
         // Sadece rakamlardan oluşuyor mu?
         let digitsOnly = value.filter { $0.isNumber }
@@ -669,15 +801,9 @@ struct SpatialParser {
     }
     
     /// Fatura numarası geçerlilik kontrolü
-    /// Tepe bölgesi sayıları, telefon numaraları ve geçersiz formatları filtreler
-    /// - Parameters:
-    ///   - candidate: Potansiyel fatura numarası
-    ///   - contextY: Bloğun Y koordinatı (0.0 = tepe, 1.0 = alt)
-    /// - Returns: Geçerli fatura numarası mı?
     private func isValidInvoiceNumber(_ candidate: String, contextY: CGFloat? = nil) -> Bool {
-        // 1. Sayfanın en tepesindeki (Y < 0.1) etiketsiz sayılar NO
+        // 1. Tepe bölgesi (Y < 0.1) salt sayı kontrolü
         if let y = contextY, y < ExtractionConstants.topMarginNoiseThreshold {
-            // Salt sayı ise tepe bölgesinde geçersiz
             if candidate.rangeOfCharacter(from: .letters) == nil {
                 return false
             }

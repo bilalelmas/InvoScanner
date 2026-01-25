@@ -1,34 +1,32 @@
 import SwiftUI
 
-// MARK: - Crystal Background
-
-/// Dinamik Aurora arka plan
+/// Dinamik hareketli arka plan efekti
 struct CrystalBackground: View {
     @State private var animate = false
     
     var body: some View {
         ZStack {
-            // Taban: Koyu Arka Plan
+            // Taban: Koyu renk
             Color(.black)
                 .ignoresSafeArea()
             
-            // Hareketli Aurora Katmanları
+            // Hareketli ışık katmanları
             ZStack {
-                // Sol Üst - Mor/Mavi
+                // Mor/Mavi ışık
                 Circle()
                     .fill(Color.indigo.opacity(0.4))
                     .frame(width: 400, height: 400)
                     .blur(radius: 100)
                     .offset(x: animate ? -100 : 100, y: animate ? -100 : 50)
                 
-                // Sağ Alt - Turkuaz/Mavi
+                // Turkuaz ışık
                 Circle()
                     .fill(Color.cyan.opacity(0.35))
                     .frame(width: 400, height: 400)
                     .blur(radius: 100)
                     .offset(x: animate ? 100 : -50, y: animate ? 200 : 0)
                 
-                // Orta - Parlak Macenta
+                // Macenta ışık
                 Circle()
                     .fill(Color.purple.opacity(0.3))
                     .frame(width: 300, height: 300)
@@ -37,7 +35,7 @@ struct CrystalBackground: View {
             }
             .animation(.easeInOut(duration: 7).repeatForever(autoreverses: true), value: animate)
             
-            // Grain Efekti
+            // Doku (Grain) efekti
             Rectangle()
                 .fill(.white.opacity(0.02))
                 .ignoresSafeArea()
@@ -46,8 +44,4 @@ struct CrystalBackground: View {
             animate = true
         }
     }
-}
-
-#Preview {
-    CrystalBackground()
 }

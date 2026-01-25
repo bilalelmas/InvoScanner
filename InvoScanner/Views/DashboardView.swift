@@ -2,33 +2,30 @@ import SwiftUI
 import Charts
 import SwiftData
 
-// MARK: - Dashboard View (Neo-Glass)
+// MARK: - Dashboard Ekranı
 
-/// Ana Dashboard ekranı - Crystal UI
-/// - Floating HUD konsepti
-/// - SwiftCharts ile neon grafikler
-/// - Glassmorphism kartlar
+/// Kristal tasarım diline sahip ana gösterge paneli
 struct DashboardView: View {
     
     @Environment(\.modelContext) private var modelContext
     
-    // Veriler - createdAt'e göre sıralı (En son kaydedilen en üstte)
+    /// Veritabanındaki tüm faturalar (Tarihe göre sıralı)
     @Query(sort: \SavedInvoice.createdAt, order: .reverse) 
     private var allInvoices: [SavedInvoice]
     
     @State private var viewModel = DashboardViewModel()
     
-    // Navigation
+    // Navigasyon durumları
     @State private var showScanner = false
     @State private var showGallery = false
     @State private var selectedInvoice: SavedInvoice?
     
     var body: some View {
         ZStack {
-            // 1. Dinamik Arka Plan
+            // Dinamik Aurora arka plan
             CrystalBackground()
             
-            // 2. İçerik
+            // Kaydırılabilir içerik
             ScrollView {
                 VStack(spacing: 24) {
                     
@@ -37,17 +34,16 @@ struct DashboardView: View {
                     if viewModel.isLoading {
                         loadingView
                     } else {
-                        
-                        // Ana Kart (Toplam Harcama)
+                        // İstatistik kartları ve grafikler
                         if !allInvoices.isEmpty {
                             mainStatsCard
                             statsGrid
                         } else {
-                            // Boş ise büyük empty state
+                            // Boş durum (Empty State)
                             emptyStateView
                         }
                         
-                        // Son İşlemler (Doluysa göster)
+                        // Son işlemler listesi
                         if !allInvoices.isEmpty {
                             recentActivitySection
                         }
@@ -61,7 +57,7 @@ struct DashboardView: View {
                 await viewModel.loadData(context: modelContext)
             }
             
-            // 3. Floating Action Button (FAB)
+            // Fatura Ekle butonu (FAB)
             VStack {
                 Spacer()
                 HStack {
@@ -92,7 +88,7 @@ struct DashboardView: View {
             }
         }
         .task {
-            // İstatistikleri hesapla
+            // Verileri yükle
             await viewModel.loadData(context: modelContext)
         }
         .fullScreenCover(isPresented: $showScanner) {
@@ -104,8 +100,9 @@ struct DashboardView: View {
         }
     }
     
-    // MARK: - Components
+    // MARK: - Alt Bileşenler
     
+    /// Üst bilgi ve profil bölümü
     private var headerSection: some View {
         HStack {
             VStack(alignment: .leading) {
@@ -118,7 +115,7 @@ struct DashboardView: View {
             }
             Spacer()
             
-            // Profil İkonu
+            // Profil ikonu
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 44))
                 .foregroundStyle(.white.opacity(0.8))
@@ -128,6 +125,7 @@ struct DashboardView: View {
         }
     }
     
+    /// Ana harcama istatistiği ve neon grafik
     private var mainStatsCard: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
@@ -144,7 +142,7 @@ struct DashboardView: View {
                 }
                 Spacer()
                 
-                // Artış/Azalış Rozeti
+                // Aylık değişim göstergesi
                 if viewModel.stats.monthOverMonthChange != 0 {
                     HStack(spacing: 4) {
                         Image(systemName: viewModel.stats.monthOverMonthChange > 0 ? "arrow.up.right" : "arrow.down.right")
@@ -159,7 +157,7 @@ struct DashboardView: View {
                 }
             }
             
-            // Neon Grafik
+            // Neon çizgi grafik
             Chart {
                 ForEach(viewModel.stats.monthlyTrend) { data in
                     LineMark(
@@ -197,6 +195,7 @@ struct DashboardView: View {
         .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
     }
     
+    /// Adet ve ortalama kartları
     private var statsGrid: some View {
         HStack(spacing: 16) {
             GlassStatCard(
@@ -215,6 +214,7 @@ struct DashboardView: View {
         }
     }
     
+    /// Son kaydedilen faturalar
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -227,7 +227,7 @@ struct DashboardView: View {
                     .foregroundStyle(.white.opacity(0.5))
             }
             
-            // Son 10 faturayı göster
+            // Son 10 işlem
             ForEach(allInvoices.prefix(10)) { invoice in
                 InvoiceItemRow(invoice: invoice)
                     .onTapGesture {
@@ -237,6 +237,7 @@ struct DashboardView: View {
         }
     }
     
+    /// Veri bulunmadığında gösterilen ekran
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -256,6 +257,7 @@ struct DashboardView: View {
         .frame(height: 300)
     }
     
+    /// Yükleme halkası
     private var loadingView: some View {
         VStack {
             ProgressView()
@@ -265,9 +267,9 @@ struct DashboardView: View {
         .frame(height: 200)
     }
     
-    // MARK: - Helpers
+    // MARK: - Yardımcı Yapılar
     
-    // Row Helper (Thumbnail loading)
+    /// Fatura listesi satırı (Görsel yükleme destekli)
     struct InvoiceItemRow: View {
         let invoice: SavedInvoice
         @State private var thumbnail: UIImage?
@@ -283,7 +285,7 @@ struct DashboardView: View {
             .task {
                 if let fileName = invoice.imageFileName {
                     let image = await Task.detached(priority: .background) {
-                    await ImageStorageService.shared.load(fileName: fileName)
+                        await ImageStorageService.shared.load(fileName: fileName)
                     }.value
                     await MainActor.run { self.thumbnail = image }
                 }
@@ -291,16 +293,16 @@ struct DashboardView: View {
         }
     }
     
+    /// Ortalama fatura tutarı hesaplama
     private func calculateAverage() -> String {
         guard !allInvoices.isEmpty else { return "₺0" }
-        // İstatistikler ViewModel'den veya Query'den gelebilir. Tutarlılık için ViewModel tercih ettim ama basitçe:
         let total = allInvoices.reduce(0) { $0 + (NSDecimalNumber(decimal: $1.totalAmount ?? 0).doubleValue) }
         let avg = total / Double(allInvoices.count)
         return String(format: "₺%.0f", avg)
     }
 }
 
-// MARK: - Glass Stat Card
+// MARK: - Cam İstatistik Kartı
 
 struct GlassStatCard: View {
     let title: String
@@ -341,8 +343,4 @@ struct GlassStatCard: View {
                 .stroke(.white.opacity(0.1), lineWidth: 1)
         )
     }
-}
-
-#Preview {
-    DashboardView()
 }

@@ -1,44 +1,35 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - Block Clusterer
+// MARK: - Blok Kümeleyici
 
-/// OCR kelimelerini mantıksal paragraflara birleştiren kümeleme motoru.
+/// OCR kelimelerini mantıksal paragraflara birleştiren motor.
 ///
 /// **Algoritma:**
-/// 1. Girdileri Y-koordinatına göre sırala (yukarıdan aşağı okuma sırası)
-/// 2. Yakınlık ve hizalamaya göre blokları birleştir
-/// 3. Sütun sınırlarını koru (sütunlar arası birleşmeyi engelle)
-///
-/// **Eşik Değerleri:**
-/// - `verticalMergeRatio`: Aynı paragraf tespiti için 1.5x satır yüksekliği
-/// - `horizontalMergeThreshold`: Aynı satırdaki kelimeleri birleştirmek için 0.1 normalize birim
-/// - `alignmentThreshold`: Sol/sağ/orta hizalama tespiti için 0.05
-/// - `columnSeparator`: Sütunlar arası "ölü bölge" 0.45-0.55
+/// 1. Y-koordinatına göre sıralama (yukarıdan aşağıya).
+/// 2. Yakınlık ve hizalamaya göre birleştirme.
+/// 3. Sütun sınırlarını koruma.
 public struct BlockClusterer {
     
-    // MARK: - Configuration
+    // MARK: - Yapılandırma
     
     public struct Config {
-        /// Maximum vertical distance as a ratio of average line height for merging
-        /// 1.5x means blocks within 1.5 line heights are considered same paragraph
+        /// Maksimum dikey mesafe oranı (satır yüksekliğinin katı)
         public let verticalMergeRatio: CGFloat
         
-        /// Maximum horizontal distance for same-line word merging (normalized)
-        /// 0.1 = 10% of page width gap is acceptable
+        /// Aynı satırda birleştirme için maksimum yatay mesafe
         public let horizontalMergeThreshold: CGFloat
         
-        /// Alignment tolerance for detecting left/right/center alignment (normalized)
-        /// 0.05 = 5% tolerance for alignment detection
+        /// Hizalama tespiti için tolerans
         public let alignmentThreshold: CGFloat
         
-        /// X-coordinate below which blocks are considered "Left Column"
+        /// Sol sütun sınırı
         public let leftColumnMaxX: CGFloat
         
-        /// X-coordinate above which blocks are considered "Right Column"
+        /// Sağ sütun sınırı
         public let rightColumnMinX: CGFloat
         
-        /// Birleştirme için maksimum X-mesafesi (sütunlar arası birleşmeyi engeller)
+        /// Sütunlar arası birleşmeyi engelleyen maksimum X mesafesi
         public let maxMergeXDistance: CGFloat
         
         public static let standard = Config(
@@ -73,25 +64,25 @@ public struct BlockClusterer {
         self.config = config
     }
     
-    // MARK: - Ana Kümeleme
+    // MARK: - Ana Kümeleme Fonksiyonları
     
-    /// Ham TextBlock'ları SemanticBlock'lara kümeler.
+    /// Ham metin bloklarını semantik bloklara dönüştürür
     public static func cluster(blocks: [TextBlock]) -> [SemanticBlock] {
         let clusterer = BlockClusterer()
         return clusterer.performClustering(blocks)
     }
     
-    /// Özel konfigürasyon ile kümeleme
+    /// Kümeleme işlemini gerçekleştirir
     public func performClustering(_ blocks: [TextBlock]) -> [SemanticBlock] {
         guard !blocks.isEmpty else { return [] }
         
-        // Step 1: Sort by Y-coordinate (reading order: top to bottom)
+        // Adım 1: Y koordinatına göre sırala
         let sortedBlocks = blocks.sorted { $0.frame.minY < $1.frame.minY }
         
-        // Step 2: Initialize clusters (each block starts in its own cluster)
+        // Adım 2: Başlangıç kümelerini oluştur
         var clusters: [[TextBlock]] = sortedBlocks.map { [$0] }
         
-        // Step 3: Iterative merge pass
+        // Adım 3: İteratif birleştirme geçişi
         var merged = true
         while merged {
             merged = false
@@ -100,7 +91,7 @@ public struct BlockClusterer {
                 var j = i + 1
                 while j < clusters.count {
                     if shouldMergeClusters(clusters[i], clusters[j]) {
-                        // Merge cluster j into cluster i
+                        // Küme j'yi küme i'ye ekle
                         clusters[i].append(contentsOf: clusters[j])
                         clusters.remove(at: j)
                         merged = true
@@ -112,22 +103,14 @@ public struct BlockClusterer {
             }
         }
         
-        // Step 4: Convert to SemanticBlocks
+        // Adım 4: SemanticBlock nesnelerine dönüştür
         return clusters.map { SemanticBlock(children: $0) }
     }
     
-    // MARK: - Merge Decision Logic
+    // MARK: - Birleştirme Mantığı
     
-    /// Determines if two clusters should be merged.
-    ///
-    /// **Merge Conditions (ANY of the following):**
-    /// 1. Vertical proximity + Alignment (same paragraph, different lines)
-    /// 2. Horizontal proximity + Same line (words on same line)
-    ///
-    /// **Anti-Merge Conditions (blocks in both clusters):**
-    /// - X-distance exceeds maxMergeXDistance (cross-column protection)
+    /// İki kümenin birleşip birleşmeyeceğine karar verir
     private func shouldMergeClusters(_ cluster1: [TextBlock], _ cluster2: [TextBlock]) -> Bool {
-        // Check all block pairs between clusters
         for block1 in cluster1 {
             for block2 in cluster2 {
                 if shouldMerge(block1: block1, block2: block2) {
@@ -138,38 +121,25 @@ public struct BlockClusterer {
         return false
     }
     
-    /// Core merge logic for two individual blocks.
-    ///
-    /// - Parameters:
-    ///   - block1: First text block
-    ///   - block2: Second text block
-    /// - Returns: true if blocks should be in the same semantic block
+    /// İki blok arasındaki birleşme kriterlerini kontrol eder
     private func shouldMerge(block1: TextBlock, block2: TextBlock) -> Bool {
         let frame1 = block1.frame
         let frame2 = block2.frame
         
-        // ──────────────────────────────────────────────────────────────
-        // CONSTRAINT: Column Separation
-        // ──────────────────────────────────────────────────────────────
-        // Blocks too far apart horizontally should NEVER merge
-        // This prevents "DSM GRUP" from merging with "FATURA NO: 12345"
+        // KISIT: Sütun Ayrımı
         let xDistance = abs(frame1.midX - frame2.midX)
         if xDistance > config.maxMergeXDistance {
             return false
         }
         
-        // Check if blocks are in different columns
+        // Farklı sütunlardaki blokları birleştirme
         let block1Column = determineColumn(frame1.midX)
         let block2Column = determineColumn(frame2.midX)
         if block1Column != block2Column && block1Column != .center && block2Column != .center {
-            return false // Different columns, don't merge
+            return false
         }
         
-        // ──────────────────────────────────────────────────────────────
-        // CASE 1: Same Line (Horizontal Merge)
-        // ──────────────────────────────────────────────────────────────
-        // Two words on the same line should merge if close enough
-        // Example: "D-MARKET" and "TICARET" -> "D-MARKET TICARET"
+        // DURUM 1: Aynı Satır (Yatay Birleştirme)
         if hasVerticalOverlap(frame1, frame2) {
             let hDistance = horizontalGap(frame1, frame2)
             if hDistance < config.horizontalMergeThreshold && hDistance >= 0 {
@@ -177,21 +147,12 @@ public struct BlockClusterer {
             }
         }
         
-        // ──────────────────────────────────────────────────────────────
-        // CASE 2: Vertical Proximity + Alignment (Paragraph Merge)
-        // ──────────────────────────────────────────────────────────────
-        // Lines in the same paragraph should merge
-        // Requires: Close vertically AND aligned (left, right, or center)
+        // DURUM 2: Dikey Yakınlık + Hizalama (Paragraf Birleştirme)
         let avgLineHeight = max(frame1.height, frame2.height)
         let vDistance = verticalGap(frame1, frame2)
-        
-        // Magic Number: 1.5x line height
-        // Rationale: Paragraph spacing is typically 1.0-1.5x line height
-        // Single-spaced text: 1.0x, 1.5-spaced: 1.5x, Double-spaced: 2.0x
         let verticalThreshold = avgLineHeight * config.verticalMergeRatio
         
         if vDistance >= 0 && vDistance < verticalThreshold {
-            // Check alignment
             if isAligned(frame1, frame2) {
                 return true
             }
@@ -200,33 +161,24 @@ public struct BlockClusterer {
         return false
     }
     
-    // MARK: - Alignment Detection
+    // MARK: - Hizalama Tespiti
     
-    /// Checks if two frames are aligned (left, right, or center).
-    ///
-    /// **Alignment Types:**
-    /// - Left-aligned: Left edges within tolerance
-    /// - Right-aligned: Right edges within tolerance
-    /// - Center-aligned: Centers within tolerance
+    /// İki kare çerçevesinin hizalı olup olmadığını kontrol eder (sol, sağ veya merkez)
     private func isAligned(_ frame1: CGRect, _ frame2: CGRect) -> Bool {
         let threshold = config.alignmentThreshold
         
-        // Left alignment: both blocks start at similar X position
         let leftAligned = abs(frame1.minX - frame2.minX) < threshold
-        
-        // Right alignment: both blocks end at similar X position
         let rightAligned = abs(frame1.maxX - frame2.maxX) < threshold
-        
-        // Center alignment: both blocks have similar center X
         let centerAligned = abs(frame1.midX - frame2.midX) < threshold
         
         return leftAligned || rightAligned || centerAligned
     }
     
-    // MARK: - Column Detection
+    // MARK: - Sütun Tespiti
     
     private enum Column { case left, center, right }
     
+    /// Verilen X koordinatına göre sütunu belirler
     private func determineColumn(_ x: CGFloat) -> Column {
         if x < config.leftColumnMaxX {
             return .left
@@ -237,24 +189,22 @@ public struct BlockClusterer {
         }
     }
     
-    // MARK: - Geometry Helpers
+    // MARK: - Geometri Yardımcıları
     
-    /// Checks if two frames overlap vertically (share Y-range).
+    /// Dikey örtüşme kontrolü
     private func hasVerticalOverlap(_ frame1: CGRect, _ frame2: CGRect) -> Bool {
         let yOverlap = min(frame1.maxY, frame2.maxY) - max(frame1.minY, frame2.minY)
         return yOverlap > 0
     }
     
-    /// Calculates horizontal gap between two frames.
-    /// Returns negative if frames overlap horizontally.
+    /// Yatay boşluk hesaplama
     private func horizontalGap(_ frame1: CGRect, _ frame2: CGRect) -> CGFloat {
         let leftFrame = frame1.minX < frame2.minX ? frame1 : frame2
         let rightFrame = frame1.minX < frame2.minX ? frame2 : frame1
         return rightFrame.minX - leftFrame.maxX
     }
     
-    /// Calculates vertical gap between two frames.
-    /// Returns negative if frames overlap vertically.
+    /// Dikey boşluk hesaplama
     private func verticalGap(_ frame1: CGRect, _ frame2: CGRect) -> CGFloat {
         let topFrame = frame1.minY < frame2.minY ? frame1 : frame2
         let bottomFrame = frame1.minY < frame2.minY ? frame2 : frame1
@@ -262,15 +212,10 @@ public struct BlockClusterer {
     }
 }
 
-// MARK: - Convenience Extension
+// MARK: - Kolaylık Eklentisi
 
 extension BlockClusterer {
-    /// Clusters and optionally filters blocks by minimum text length.
-    ///
-    /// - Parameters:
-    ///   - blocks: Input text blocks
-    ///   - minTextLength: Minimum text length to include (filters noise)
-    /// - Returns: Filtered and clustered semantic blocks
+    /// Blokları seyreltir ve kümeler
     public func cluster(_ blocks: [TextBlock], minTextLength: Int = 1) -> [SemanticBlock] {
         let filtered = blocks.filter { $0.text.count >= minTextLength }
         return performClustering(filtered)

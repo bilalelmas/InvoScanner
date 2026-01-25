@@ -1,20 +1,18 @@
 import SwiftUI
 
-/// .0 Crystal UI: Cam Fatura Listesi Satırı
-/// - SavedInvoice veya Invoice modelleriyle çalışabilir
+/// Cam efektli fatura listesi satırı
 struct GlassInvoiceRow: View {
-    // Veri Modeli: SavedInvoice (Persistence) veya Invoice (Transient)
     let supplierName: String
     let totalAmount: Decimal?
     let date: Date?
     let isVerified: Bool
     
-    // Opsiyonel Görsel
+    /// Opsiyonel fatura görseli
     var thumbnail: UIImage? = nil
     
     var body: some View {
         HStack(spacing: 16) {
-            // İkon / Görsel
+            // Görsel veya İkon bölümü
             ZStack {
                 Circle()
                     .fill(.white.opacity(0.1))
@@ -33,7 +31,7 @@ struct GlassInvoiceRow: View {
                         .foregroundStyle(.white.opacity(0.8))
                 }
                 
-                // Onay Rozeti
+                // Doğrulama rozeti
                 if isVerified {
                     VStack {
                         Spacer()
@@ -50,7 +48,7 @@ struct GlassInvoiceRow: View {
             }
             .frame(width: 48, height: 48)
             
-            // Bilgiler
+            // Fatura bilgileri
             VStack(alignment: .leading, spacing: 4) {
                 Text(supplierName)
                     .font(.system(.body, design: .rounded).weight(.semibold))
@@ -66,7 +64,7 @@ struct GlassInvoiceRow: View {
             
             Spacer()
             
-            // Tutar
+            // Tutar bilgisi
             if let amount = totalAmount {
                 Text(amount.formatted(.currency(code: "TRY")))
                     .font(.system(.callout, design: .rounded).weight(.bold))
@@ -81,18 +79,5 @@ struct GlassInvoiceRow: View {
                 .stroke(.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-    }
-}
-
-#Preview {
-    ZStack {
-        Color.indigo
-        GlassInvoiceRow(
-            supplierName: "TRENDYOL LOJİSTİK",
-            totalAmount: 1250.90,
-            date: Date(),
-            isVerified: true
-        )
-        .padding()
     }
 }

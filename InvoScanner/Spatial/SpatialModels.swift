@@ -25,47 +25,41 @@ public struct TextBlock: Identifiable, Equatable, Hashable {
         self.frame = frame
     }
     
-    // MARK: Convenience Properties
+    // MARK: Yardımcı Özellikler
     
-    /// Center point of the text block
+    /// Bloğun merkez noktası
     public var center: CGPoint {
         CGPoint(x: frame.midX, y: frame.midY)
     }
     
-    /// Average line height estimation (for single-line blocks)
+    /// Tahmini satır yüksekliği (tek satırlık bloklar için)
     public var estimatedLineHeight: CGFloat {
         frame.height
     }
     
-    // MARK: Geometry Helpers
+    // MARK: Geometri Yardımcıları
     
-    /// Checks if this block is on approximately the same line as another.
-    /// Uses Y-midpoint comparison with a configurable threshold.
-    ///
+    /// Bu bloğun diğeriyle aynı satırda olup olmadığını kontrol eder
     /// - Parameters:
-    ///   - other: The other block to compare
-    ///   - threshold: Maximum Y-midpoint difference (default: 2% of page height)
-    /// - Returns: true if blocks are on the same horizontal line
+    ///   - other: Karşılaştırılacak diğer blok
+    ///   - threshold: Maksimum Y farkı (varsayılan: sayfa yüksekliğinin %2'si)
+    /// - Returns: Bloklar aynı yatay satırdaysa true
     public func isSameLine(as other: TextBlock, threshold: CGFloat = 0.02) -> Bool {
         return abs(self.frame.midY - other.frame.midY) < threshold
     }
     
-    /// Calculates horizontal distance to another block (gap between edges).
-    /// Returns negative if blocks overlap horizontally.
-    ///
-    /// - Parameter other: The other block
-    /// - Returns: Distance between right edge of leftmost block and left edge of rightmost block
+    /// Diğer bloğa olan yatay mesafeyi hesaplar (kenarlar arası boşluk)
+    /// - Parameter other: Diğer blok
+    /// - Returns: En soldaki bloğun sağ kenarı ile en sağdakinin sol kenarı arası mesafe
     public func horizontalDistance(to other: TextBlock) -> CGFloat {
         let leftBlock = self.frame.minX < other.frame.minX ? self : other
         let rightBlock = self.frame.minX < other.frame.minX ? other : self
         return rightBlock.frame.minX - leftBlock.frame.maxX
     }
     
-    /// Calculates vertical distance to another block (gap between edges).
-    /// Returns negative if blocks overlap vertically.
-    ///
-    /// - Parameter other: The other block
-    /// - Returns: Distance between bottom edge of upper block and top edge of lower block
+/// Diğer bloğa olan dikey mesafeyi hesaplar (kenarlar arası boşluk)
+    /// - Parameter other: Diğer blok
+    /// - Returns: Üst bloğun alt kenarı ile alt bloğun üst kenarı arası mesafe
     public func verticalDistance(to other: TextBlock) -> CGFloat {
         let upperBlock = self.frame.minY < other.frame.minY ? self : other
         let lowerBlock = self.frame.minY < other.frame.minY ? other : self
@@ -75,11 +69,11 @@ public struct TextBlock: Identifiable, Equatable, Hashable {
 
 // MARK: - SemanticBlock
 
-/// Clustered paragraph: Represents a logical grouping of TextBlocks.
-/// Used after spatial clustering to represent coherent text regions.
+/// Kümelenmiş paragraf: TextBlock'ların mantıksal gruplandırılması
+/// Uzamsal kümeleme sonrası tutarlı metin bölgelerini temsil eder
 ///
-/// - Important: The `children` array should be sorted by reading order
-///   (top-to-bottom, left-to-right) for proper text reconstruction.
+/// - Önemli: `children` dizisi okuma sırasına göre sıralı olmalıdır
+///   (yukarıdan aşağıya, soldan sağa)
 public struct SemanticBlock: Identifiable, Equatable {
     public let id: UUID
     public var children: [TextBlock]
@@ -91,10 +85,9 @@ public struct SemanticBlock: Identifiable, Equatable {
         self.label = label
     }
     
-    // MARK: Computed Properties
+    // MARK: Hesaplanan Özellikler
     
-    /// The union (bounding box) of all child frames.
-    /// Uses CGRect.union for precise geometry calculation.
+    /// Tüm çocuk çerçevelerin birleşimi (bounding box)
     public var frame: CGRect {
         guard let first = children.first else { return .zero }
         
@@ -103,32 +96,30 @@ public struct SemanticBlock: Identifiable, Equatable {
         }
     }
     
-    /// Center point of the semantic block's bounding box.
+    /// Semantik bloğun merkez noktası
     public var center: CGPoint {
         CGPoint(x: frame.midX, y: frame.midY)
     }
     
-    /// Joined text of all children.
-    /// - Children on the same line are joined with spaces
-    /// - Children on different lines are joined with newlines
+    /// Tüm çocukların birleştirilmiş metni
+    /// - Aynı satırdakiler boşlukla, farklı satırdakiler alt satır karakteriyle birleşir
     ///
-    /// **Algorithm:**
-    /// 1. Sort children by Y-coordinate (top to bottom)
-    /// 2. Group children that are on the same line
-    /// 3. Within each line, sort by X-coordinate (left to right)
-    /// 4. Join with spaces (same line) and newlines (different lines)
+    /// **Algoritma:**
+    /// 1. Y koordinatına göre sıralama
+    /// 2. Aynı satırdaki blokları gruplama
+    /// 3. Satır içi X koordinatına göre sıralama
+    /// 4. Boşluk ve alt satır karakteriyle birleştirme
     public var text: String {
         guard !children.isEmpty else { return "" }
         
-        // Sort by Y first
+        // Önce Y koordinatına göre sırala
         let sortedByY = children.sorted { $0.frame.minY < $1.frame.minY }
         
-        // Group into lines
+        // Satırlara grupla
         var lines: [[TextBlock]] = []
         var currentLine: [TextBlock] = []
         
-        // Magic Number: 1% of page height for precise line separation
-        // 0.02 was causing line mixing, 0.01 provides sharper separation
+        // Hassas satır ayrımı için eşik değer (Sayfa yüksekliğinin %1'i)
         let lineThreshold: CGFloat = 0.01
         
         for block in sortedByY {
@@ -148,7 +139,7 @@ public struct SemanticBlock: Identifiable, Equatable {
             lines.append(currentLine)
         }
         
-        // Sort each line by X, then join
+        // Her satırı X'e göre sırala ve birleştir
         return lines
             .map { line in
                 line.sorted { $0.frame.minX < $1.frame.minX }
@@ -158,62 +149,53 @@ public struct SemanticBlock: Identifiable, Equatable {
             .joined(separator: "\n")
     }
     
-    /// Average line height within this semantic block.
-    /// Used for merge threshold calculations.
+    /// Bu semantik blok içindeki ortalama satır yüksekliği
     public var averageLineHeight: CGFloat {
-        guard !children.isEmpty else { return 0.02 } // Default fallback
+        guard !children.isEmpty else { return 0.02 }
         let totalHeight = children.reduce(0) { $0 + $1.frame.height }
         return totalHeight / CGFloat(children.count)
     }
 }
 
-// MARK: - BlockLabel
+// MARK: - Blok Etiketi
 
-/// Semantic labels for document regions.
-/// Each label represents a specific functional area of an invoice.
+/// Belge bölgeleri için semantik etiketler
+/// Her etiket, faturanın belirli bir fonksiyonel alanını temsil eder
 ///
-/// **Label Priority for Conflict Resolution:**
-/// - ETTN has highest priority (unique identifier)
-/// - Seller/Buyer/Meta have medium priority (key information)
-/// - Totals has medium-high priority (financial data)
-/// - Noise has low priority (can be safely ignored)
-/// - Unknown is default fallback
+/// **Öncelik Sıralaması:**
+/// - ETTN: En yüksek (benzersiz kimlik)
+/// - Satıcı/Alıcı/Meta: Orta (ana bilgiler)
+/// - Toplamlar: Orta-yüksek (finansal veriler)
+/// - Noise: Düşük (yoksayılabilir)
+/// - Unknown: Varsayılan (tanımlanamayan)
 public enum BlockLabel: String, CaseIterable, Equatable {
-    
-    /// Seller information block (Top-Left quadrant)
-    /// Contains: Company name, VKN, MERSIS, Tax office
+    /// Satıcı bilgileri (Sol-üst bölge)
     case seller = "SELLER"
     
-    /// Buyer information block (Left column, below seller)
-    /// Contains: "SAYIN", customer name, delivery address
+    /// Alıcı bilgileri (Sol sütun, satıcı altı)
     case buyer = "BUYER"
     
-    /// Invoice metadata block (Top-Right quadrant)
-    /// Contains: Invoice number, date, time, scenario
+    /// Fatura meta verileri (Sağ-üst bölge)
     case meta = "META"
     
-    /// Totals block (Bottom-Right quadrant)
-    /// Contains: Subtotal, VAT, Grand total, Payable amount
+    /// Toplamlar bloğu (Sağ-alt bölge)
     case totals = "TOTALS"
     
-    /// ETTN block (can be anywhere, usually isolated)
-    /// Contains: UUID format (8-4-4-4-12)
+    /// ETTN bloğu (Her yerde olabilir)
     case ettn = "ETTN"
     
-    /// Noise block (logos, QR codes, bank info)
-    /// Contains: IBAN, bank name, MERSIS NO (isolated lines)
+    /// Gürültü bloğu (Logo, QR, banka bilgisi)
     case noise = "NOISE"
     
-    /// Content/Table block (center region)
-    /// Contains: Product/service list, item details
+    /// İçerik/Tablo bloğu (Orta bölge)
     case content = "CONTENT"
     
-    /// Unclassified block (default)
+    /// Sınıflandırılmamış (Varsayılan)
     case unknown = "UNKNOWN"
     
-    // MARK: Properties
+    // MARK: Özellikler
     
-    /// Turkish description for UI display
+    /// Kullanıcı arayüzü için Türkçe açıklama
     public var description: String {
         switch self {
         case .seller: return "Satıcı Bilgileri"
@@ -227,8 +209,7 @@ public enum BlockLabel: String, CaseIterable, Equatable {
         }
     }
     
-    /// Expected vertical position priority (lower = higher on page)
-    /// Used for conflict resolution when multiple blocks compete
+    /// Beklenen dikey konum önceliği (düşük = daha yukarıda)
     public var expectedYPriority: Int {
         switch self {
         case .seller: return 1
@@ -242,24 +223,22 @@ public enum BlockLabel: String, CaseIterable, Equatable {
         }
     }
     
-    /// Confidence weight for scoring system
-    /// Higher weight = more important for final extraction
+    /// Karar sistemi için güven ağırlığı
     public var confidenceWeight: Double {
         switch self {
-        case .ettn: return 1.0     // Critical - unique identifier
-        case .totals: return 0.9   // High - financial data
-        case .seller: return 0.8   // High - key party
-        case .meta: return 0.7     // Medium - invoice details
-        case .buyer: return 0.6    // Medium - customer info
-        case .content: return 0.3  // Low - supporting data
-        case .noise: return 0.0    // Ignore
-        case .unknown: return 0.1  // Needs investigation
+        case .ettn: return 1.0     // Kritik - benzersiz kimlik
+        case .totals: return 0.9   // Yüksek - finansal veri
+        case .seller: return 0.8   // Yüksek - ana taraf
+        case .meta: return 0.7     // Orta - fatura detayları
+        case .buyer: return 0.6    // Orta - müşteri bilgisi
+        case .content: return 0.3  // Düşük - destekleyici veri
+        case .noise: return 0.0    // Yoksay
+        case .unknown: return 0.1  // İnceleme gerektirir
         }
     }
 }
 
-// MARK: - LabeledBlock (Convenience Alias)
+// MARK: - LabeledBlock (Takma Ad)
 
-/// Type alias for a SemanticBlock with an assigned label.
-/// Used in the output of BlockLabeler for clarity.
+/// Etiketlenmiş bir SemanticBlock için kullanılan tip takma adı.
 public typealias LabeledBlock = SemanticBlock
