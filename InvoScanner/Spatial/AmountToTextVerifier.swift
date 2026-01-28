@@ -112,9 +112,13 @@ public struct AmountToTextVerifier {
     // MARK: - Benzerlik Hesaplama
     
     /// Jaccard benzerlik oranı (kesişim / birleşim)
+    /// Türkçe karakterleri normalize ederek karşılaştırır
     private func calculateSimilarity(_ text1: String, _ text2: String) -> Double {
-        let words1 = Set(text1.uppercased().components(separatedBy: .whitespaces).filter { !$0.isEmpty })
-        let words2 = Set(text2.uppercased().components(separatedBy: .whitespaces).filter { !$0.isEmpty })
+        let normalized1 = normalizeTurkish(text1)
+        let normalized2 = normalizeTurkish(text2)
+        
+        let words1 = Set(normalized1.uppercased().components(separatedBy: .whitespaces).filter { !$0.isEmpty })
+        let words2 = Set(normalized2.uppercased().components(separatedBy: .whitespaces).filter { !$0.isEmpty })
         
         guard !words1.isEmpty && !words2.isEmpty else { return 0.0 }
         
@@ -122,5 +126,21 @@ public struct AmountToTextVerifier {
         let union = words1.union(words2).count
         
         return Double(intersection) / Double(union)
+    }
+    
+    /// Türkçe karakterleri ASCII eşdeğerlerine dönüştürür
+    private func normalizeTurkish(_ text: String) -> String {
+        text.replacingOccurrences(of: "İ", with: "I")
+            .replacingOccurrences(of: "Ş", with: "S")
+            .replacingOccurrences(of: "Ğ", with: "G")
+            .replacingOccurrences(of: "Ü", with: "U")
+            .replacingOccurrences(of: "Ö", with: "O")
+            .replacingOccurrences(of: "Ç", with: "C")
+            .replacingOccurrences(of: "ı", with: "i")
+            .replacingOccurrences(of: "ş", with: "s")
+            .replacingOccurrences(of: "ğ", with: "g")
+            .replacingOccurrences(of: "ü", with: "u")
+            .replacingOccurrences(of: "ö", with: "o")
+            .replacingOccurrences(of: "ç", with: "c")
     }
 }

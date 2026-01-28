@@ -1,0 +1,14 @@
+# InvoScanner Git Ignore
+
+# Akademik Dokümantasyon (Commit edilmemeli)
+AKADEMIK_PROJE_REHBERI.md
+
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# macOS
+.DS_Store

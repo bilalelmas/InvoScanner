@@ -139,7 +139,7 @@ final class GoldenTests: XCTestCase {
             (250.50, "İKİ YÜZ ELLİ TL ELLİ KURUŞ")
         ]
         
-        for (amount, expected) in testCases {
+        for (amount, _) in testCases {
             let text = amountVerifier.convertToText(amount)
             print("Amount: \(amount) -> \(text)")
             // İçerme kontrolü (tam eşleşme zor olabilir)

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Ana içerik görünümü
-/// - TabView ile Dashboard ve Liste arasında geçiş
+/// - TabView ile Dashboard, Liste, Tarama ve Demo arasında geçiş
 struct ContentView: View {
     @State private var selectedTab = 0
     
@@ -24,6 +24,12 @@ struct ContentView: View {
                     Label("Tarama", systemImage: "doc.viewfinder")
                 }
                 .tag(2)
+            
+            DemoView()
+                .tabItem {
+                    Label("Demo Test", systemImage: "testtube.2")
+                }
+                .tag(3)
         }
     }
 }

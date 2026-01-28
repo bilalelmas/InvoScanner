@@ -1,0 +1,62 @@
+{
+  "description": "Jüri Sunumu - InvoScanner Doğruluk Testi",
+  "version": "1.0",
+  "createdAt": "2026-01-25",
+  "testInvoices": [
+    {
+      "id": 1,
+      "fileName": "1",
+      "expected": {
+        "ettn": "E0344647-5BAF-4AFB-924B-4719B1E5364F",
+        "invoiceNumber": "ARV2024000064909",
+        "supplierName": "Moonlıfe Mobilya Sanayi Ve Ticaret Anonim Şirketi",
+        "totalAmount": 1850.00,
+        "date": "2024-11-13"
+      }
+    },
+    {
+      "id": 2,
+      "fileName": "2",
+      "expected": {
+        "ettn": "006C17A6-091B-44AF-824E-AADA05F0889A",
+        "invoiceNumber": "TEA2024000456201",
+        "supplierName": "Turuncu Elma Elkt.Tic.ve Bil. Tekn. San.ve Tic.Ltd.Şti",
+        "totalAmount": 1719.90,
+        "date": "2024-08-20"
+      }
+    },
+    {
+      "id": 3,
+      "fileName": "3",
+      "expected": {
+        "ettn": "26FF0AD8-89BD-4068-8CC7-921448B5D3D7",
+        "invoiceNumber": "SLV2025000027962",
+        "supplierName": "SALVANİNİ ANKASTRE SİSTEMLERİ SANAYİ DIŞ TİCARET LİMİTED ŞİRKETİ",
+        "totalAmount": 1799.00,
+        "date": "2025-10-06"
+      }
+    },
+    {
+      "id": 4,
+      "fileName": "4",
+      "expected": {
+        "ettn": "075D4992-2BD0-4CF2-88C5-DC2071D24553",
+        "invoiceNumber": "TYS2025026176681",
+        "supplierName": "DSM Grup Danışmanlık İletişim ve Satış Ticaret A.Ş.",
+        "totalAmount": 3143.99,
+        "date": "2025-09-29"
+      }
+    },
+    {
+      "id": 5,
+      "fileName": "5",
+      "expected": {
+        "ettn": "E84719C0-0D00-412B-9CFE-32CB74A2B55C",
+        "invoiceNumber": "TEA2025000009555",
+        "supplierName": "ŞÜKRÜ ARDIÇ",
+        "totalAmount": 1291.29,
+        "date": "2025-12-03"
+      }
+    }
+  ]
+}
